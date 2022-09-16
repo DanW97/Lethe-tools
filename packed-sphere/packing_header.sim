@@ -1,0 +1,16 @@
+#=================================================================================================
+# Baked in LIGGGHTS stuff that doesn't need to be specified in Python. To change the simulation 
+# volume, edit the Vx, Vy and Vz parameters to change the box volume
+#
+# Author:   Daniel Weston <dtw545@student.bham.ac.uk>
+# Date:     03.3.2022
+# License:  MIT
+#=================================================================================================
+
+atom_style      granular
+atom_modify     map array sort 0 0.0
+newton          off
+boundary        f f f 
+communicate     single vel yes
+units           si 
+timestep        0.00001

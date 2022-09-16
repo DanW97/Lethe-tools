@@ -1,0 +1,234 @@
+#=================================================================================================
+# Simulating fluid flowing over a dense particle packing. This file contains the baked in 
+# settings that are appended by the requisite particle properties. Particles are placed in the
+# box shown below.
+#           
+#        +------+.      
+#        |`.    | `.      
+#        |  `+--+---+   
+#        |   |  |   |    
+#        +---+--+.  |    x\ |z
+#         `. |    `.|      \|
+#           `+------+       +---y
+#
+# Fluid enters from -x, leaving through +x. Periodic boundaries are set for y and z               
+#
+#
+# Author:   Daniel Weston <dtw545@student.bham.ac.uk>
+# Date:     06.03.2022
+# License:  MIT
+#=================================================================================================
+
+
+#-------------------------------------------------------------------------------------------------
+# Simulation and IO Control
+#-------------------------------------------------------------------------------------------------
+subsection simulation control
+    set method                          = bdf2
+    set bdf startup method              = multiple step bdf
+
+    set time step                       = 0.0001                # Time step
+    set time end                        = 10
+    set adapt                           = true
+    set max cfl                         = 0.8
+    set adaptative time step scaling    = 1.1
+
+    set output name                     = packed_spheres        # Prefix for VTU outputs
+    set output path                     = ./results/            # Output directory
+    set output boundaries               = true                  # Output domain boundaries
+    set output frequency                = 1                     # Frequency of simulation output
+    set subdivision                     = 1                     # Output mesh subdivision
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Simulation Checkpointing
+#-------------------------------------------------------------------------------------------------
+subsection restart
+    set checkpoint                      = false                 # Disable checkpointing as this has issues with the particles used
+    set restart                         = false                 # Start from previous checkpoint
+    set filename                        = restart
+    set frequency                       = 10
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Force
+#-------------------------------------------------------------------------------------------------
+subsection forces
+    set verbosity                       = verbose
+    set calculate force                 = true
+    set force name                      = force
+    set calculate torque                = true
+    set torque name                     = torque
+
+    set output precision                = 15
+    set calculation frequency           = 1
+    set output frequency                = 1
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# FEM
+#-------------------------------------------------------------------------------------------------
+subsection FEM
+    set velocity order                  = 1
+    set pressure order                  = 1
+    set qmapping all                    = false
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Physical Properties
+#-------------------------------------------------------------------------------------------------
+subsection physical properties
+    subsection fluid 0
+        set kinematic viscosity = 0.000001 # water
+    end
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Timer
+#-------------------------------------------------------------------------------------------------
+subsection timer
+    set type                            = iteration
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Mesh
+#-------------------------------------------------------------------------------------------------
+subsection mesh
+    # Automatically generate mesh using deal.II's functions:
+    # https://www.dealii.org/current/doxygen/deal.II/namespaceGridGenerator.html
+    set type                            = dealii
+    set grid type                       = hyper_rectangle
+    set grid arguments                  = -0.5, -0.5, -0.5 : 0.5, 0.5, 0.5 : true ###
+    set initial refinement              = 6
+end
+
+#-------------------------------------------------------------------------------------------------
+# Mesh Adaptation Control
+#-------------------------------------------------------------------------------------------------
+subsection mesh adaptation
+    set fraction coarsening     = 0.01
+    set fraction refinement     = 0.01
+
+    set fraction type           = number
+    set frequency               = 1
+    set max number elements     = 2500000
+    set max refinement level    = 6
+    set min refinement level    = 4
+
+    set type                    = kelly
+    set variable                = pressure
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Non-Linear Solver Control
+#-------------------------------------------------------------------------------------------------
+subsection non-linear solver
+    set verbosity               = verbose
+    set solver                  = newton
+    set max iterations          = 10
+    set tolerance               = 1e-5
+end
+
+
+#-------------------------------------------------------------------------------------------------
+# Linear Solver Control
+#-------------------------------------------------------------------------------------------------
+subsection linear solver
+    set verbosity                                   = verbose
+
+    # GMRES linear solver, good for < 1,000,000 elements
+    set method                                      = gmres
+    set max iters                                   = 5000
+    set max krylov vectors                          = 1000
+    set relative residual                           = 1e-3
+    set minimum residual                            = 1e-10
+    set ilu preconditioner fill                     = 1
+    set ilu preconditioner absolute tolerance       = 1e-12
+    set ilu preconditioner relative tolerance       = 1.00
+
+    # AMG linear solver, more efficient for > 1,000,000 elements
+    # set method                                      = amg
+    # set max iters                                   = 1000
+    # set max krylov vectors                          = 1000
+    # set relative residual                           = 1e-3
+    # set minimum residual                            = 1e-10
+    # set amg preconditioner ilu fill                 = 0
+    # set amg preconditioner ilu absolute tolerance   = 1e-20
+    # set amg preconditioner ilu relative tolerance   = 1.00
+    # set amg aggregation threshold                   = 1e-12
+    # set amg n cycles                                = 1
+    # set amg w cycles                                = false
+    # set amg smoother sweeps                         = 2
+    # set amg smoother overlap                        = 1
+end
+
+#-------------------------------------------------------------------------------------------------
+# Initial condition
+#-------------------------------------------------------------------------------------------------
+subsection initial conditions
+    set type = nodal
+    subsection uvwp
+        set Function expression         = 0.1;0;0;0
+    end
+end
+
+#-------------------------------------------------------------------------------------------------
+# Boundary Conditions
+#-------------------------------------------------------------------------------------------------
+subsection boundary conditions
+    # Box hull, xmin, xmax, ymin, ymax, zmin, zmax = boundary ID 0, 1, 2, 3, 4, 5
+    set number                  = 3
+    subsection bc 0 # inlet
+        set id                  = 0
+        set type                = function
+        subsection u
+          set Function expression = 0.1
+        end
+        subsection v
+            set Function expression = 0
+        end
+        subsection w
+            set Function expression = 0
+        end
+    end
+
+    subsection bc 1 # periodic y walls
+        set id                  = 2
+        set type                = periodic
+        set periodic_id         = 3
+        set periodic_direction  = 1
+    end
+
+    subsection bc 2 # periodic z walls
+        set id                  = 4
+        set type                = periodic
+        set periodic_id         = 5
+        set periodic_direction  = 2
+    end
+end
+
+subsection particles
+    set stencil order                           = 6                     # Sphere interpolation
+    set length ratio                            = 4                     # 2 * Q * aspect ratio
+    # set particle nonlinear tolerance            = 1e-3
+    set alpha                                   = 1
+
+    set calculate force                         = true
+    set ib force output file                    = spheres_force
+    set ib particles pvd file                   = spheres_data
+
+    set initial refinement                      = 1
+    set refine mesh inside radius factor        = 0.8
+    set refine mesh outside radius factor       = 1.2
+
+    set integrate motion                        = false
+    set assemble Navier-Stokes inside particles = false
+
+    
