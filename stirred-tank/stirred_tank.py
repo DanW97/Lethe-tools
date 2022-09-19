@@ -170,10 +170,10 @@ class StirredTankBuilder:
                 raise ValueError("Axis alignment value is *only* 0, 1 or 2!")
         gm.synchronize()
         gm.addPhysicalGroup(
-            SURFACE, [tag for _, tag in gmsh.model.getEntities(SURFACE)], name="surf"
+            SURFACE, [tag for _, tag in gmsh.model.getEntities(SURFACE)], name="1"
         )
         gm.addPhysicalGroup(
-            VOLUME, [tag for _, tag in gmsh.model.getEntities(VOLUME)], name="vol"
+            VOLUME, [tag for _, tag in gmsh.model.getEntities(VOLUME)], name="1"
         )
         gm.synchronize()
 
