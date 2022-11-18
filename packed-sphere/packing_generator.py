@@ -31,6 +31,7 @@ class PackingGenerator:
         self.Re_min = 0.1
         self.packing_header_file = "packing_header.sim"
         self.sim_header_file = "packed_spheres_header.prm"
+        self.particle_file = "particles"
         self.Vx = Vx 
         self.Vy = Vy 
         self.Vz = Vz
@@ -110,9 +111,17 @@ class PackingGenerator:
             rad = sim.radii()
             real_phi = sum(4/3*np.pi*rad**3)/(self.Vx*self.Vy*self.Vz*8)
             self.real_phi[i] = real_phi
-            self.write_prm(pos, rad, real_phi, i)
-            
-    def write_prm(self, pos, rad, real_phi, suffix):
+            self.write_particle_file(pos, rad)
+            self.write_prm(real_phi, i)
+
+    def write_particle_file(self, pos, rad):
+        """Write Lethe particles file"""
+        with open(self.particle_file, "w") as f:
+            f.write("type shape_argument_0 p_x p_y p_z v_x v_y v_z omega_x omega_y omega_z\n")
+            for i, (position, radius) in enumerate(zip(pos, rad)):
+                f.write(f"sphere, {radius}, {position[0]}, {position[1]}, {position[2]}, 0, 0, 0, 0, 0, 0\n")
+    
+    def write_prm(self, real_phi, suffix):
         """Write Lethe .prm file for each simulation"""
         kinematic_viscosity = 1e-6 #water
         with open(self.sim_header_file, 'r') as f:
@@ -129,27 +138,6 @@ class PackingGenerator:
             inlet_velocity = kinematic_viscosity*reynolds_number/hydraulic_diameter
             header[177] = f"        set Function expression         = {inlet_velocity};0;0;0\n"
             header[191] = f"          set Function expression = {inlet_velocity}\n"
-            # immersed boundary particle generation
-            particle_info = []
-            particle_write = particle_info.append
-            for i, (position, radius) in enumerate(zip(pos, rad)):
-                particle_write(f"    subsection particle info {i}\n")
-                particle_write("        set density                             = 1\n") #dummy value since motion is not integrated
-                particle_write("        subsection position\n")
-                particle_write(f"            set Function expression             = {position[0]};{position[1]};{position[2]}\n")
-                particle_write("        end\n")
-                particle_write("        subsection velocity\n")
-                particle_write("            set Function expression             = 0;0;0\n")
-                particle_write("        end\n")
-                particle_write(f"        set radius                              = {radius}\n")
-                particle_write("    end\n\n")
-
-            with open(self.sim_folder + os.sep + self.sim_filename+f"_{suffix}.prm", "w") as sim:
-                sim.writelines(header)
-                sim.writelines(f"set number of particles                     = {np.shape(pos)[0]}\n")
-                sim.writelines(particle_info)
-                sim.writelines("end")
-
 
 a = PackingGenerator(m=5)
 a.psd()

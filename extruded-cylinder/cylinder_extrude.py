@@ -22,9 +22,9 @@ class Cylinder:
     Attributes
     ----------
     radius : int, optional
-            Cylinder radius in mm, by default 49
+            Cylinder radius in m, by default 0.049
     height : int, optional
-            Cylinder height in mm, by default 2000
+            Cylinder height in m, by default 2
     radial_npts : int, optional
             Number of points on transfinite curves in x and y, by default 5
     height_npts : int, optional
@@ -41,34 +41,11 @@ class Cylinder:
             Ratio of diamond half-length (half the diagonal length of a square) to cylinder radius
     """
 
-    def __init__(self, radius=0.049, height=2, radial_npts=5, height_npts=20, filepath="cylinder", radial_coef=1.0, height_coef=1.0, diamond_coef=1.0, diamond_ratio=0.5) -> None:
-        """Class constructor for Cylinder
-
-        Parameters
-        ----------
-        radius : int, optional
-                Cylinder radius in m, by default 0.049
-        height : int, optional
-                Cylinder height in m, by default 2
-        radial_npts : int, optional
-                Number of points on transfinite curves in x and y, by default 5
-        height_npts : int, optional
-                Number of points on transfinite curves in z, by default 20
-        filepath : str, optional
-                Path to save .geo and .msh files - extensions added automatically by this class, by default "cylinder"
-        radial_coef : float , optional
-                Geometric progression coefficient for transfinite curves defining circle segments in x and y, by default 1.
-        height_coef : float , optional
-                Geometric progression coefficient for transfinite lines in z, by default 1.
-        diamond_coef : float , optional
-                Geometric progression coefficient for transfinite curves defining center diamond in x and y, by default 1.
-        diamond_ratio : float , optional
-                Ratio of diamond half-length (half the diagonal length of a square) to cylinder radius
-        """
+    def __init__(self, radius=0.049, height=0.5, radial_npts=5, height_npts=20, filepath="cylinder", radial_coef=1.0, height_coef=1.0, diamond_coef=1.0, diamond_ratio=0.5) -> None:
         # Parameter check
         assert diamond_ratio < 1 and diamond_ratio > 0
-        self.radius = radius/1000
-        self.height = height/1000
+        self.radius = radius
+        self.height = height
         self.radial_npts = radial_npts
         self.height_npts = height_npts
         self.filepath = filepath
@@ -208,17 +185,11 @@ class Cylinder:
         new_file = f"{self.filepath}.geo"
         gmsh.write(raw_file)
         gmsh.model.mesh.generate(VOLUME)
+        gmsh.model.mesh.setOrder(2)
         gmsh.model.geo.synchronize()
-        types = [i + 1 for i in range(31)]
-        types.append(92)
-        types.append(93)
-        # Should only see types 1, 3, 5 and 15
-        for type in types:
-            els = gmsh.model.mesh.getElementsByType(type)
-            print(type, els)
         gmsh.write(f"{self.filepath}.msh")
         import os
-        os.system(f"mv {raw_file} {new_file}")
+        os.replace(f"{raw_file}", f"{new_file}")
 
     def view(self):
         """Visualise the geo file"""
@@ -226,6 +197,6 @@ class Cylinder:
             gmsh.fltk.run()
 
 
-cyl = Cylinder(height_npts=30, radial_npts=7)
+cyl = Cylinder()
 cyl.draw()
 cyl.view()

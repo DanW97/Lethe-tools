@@ -6,7 +6,6 @@
 # Version :   0.1.0
 # Contact :   dtw545@student.bham.ac.uk
 
-import gc
 import gmsh
 import sys
 import numpy as np
@@ -36,6 +35,47 @@ class RushtonTurbineBuilder:
         filepath="rushton",
         view = True
     ) -> None:
+        """
+        Class to build a Rushton turbine, with given dimensions.
+        This class assumes that the turbine is made of 3 cylinders:
+
+        1) The main shaft
+        2) A "connector" that is wider than the cylinder, bridging the shaft
+        and the hub that the blades attach to.
+        3) The hub, where the blades are mounted to. N.B: it is assumed that the blades'
+        centres lie on the edge of the hub.
+
+        Parameters 
+        ----------
+        shaft_height : float, optional
+            Height of the shaft (neglecting the blade hub), by default 0.12333
+        shaft_radius : float, optional
+            Radius of the shaft, by default 0.00375
+        connector_height : float, optional
+            Height of the connector, by default 0.00956
+        connector_radius : float, optional
+            Radius of the connector, by default 0.00625
+        hub_height : float, optional
+            Height of the hub, by default 0.00058
+        hub_radius : float, optional
+            Radius of the hub, by default 0.025
+        blade_height : float, optional
+            Height of the blade, by default 0.01333
+        blade_width : float, optional
+            Width (or thickness) of the blade, by default 0.00089
+        blade_depth : float, optional
+            Depth (or extension from the hub of the blade), by default 0.01667
+        axis_alignment : int, optional
+            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively, by default 1
+        offset : float, optional
+            Distance between the base of the blades and the tank bottom, by default 0.060
+        nblades : int, optional
+            Number of blades, by default 6
+        filepath : str, optional
+            Name of msh and geo files created by this class, by default "rushton"
+        view : bool, optional
+            Display the resultant mesh in gmsh, by default True
+        """
         self.shaft_height = shaft_height
         self.shaft_radius = shaft_radius
         self.connector_height = connector_height
@@ -52,6 +92,14 @@ class RushtonTurbineBuilder:
         self.view = view
 
     def draw(self):
+        """
+        Draw the turbine.
+
+        Raises
+        ------
+        ValueError
+            Exception raised for invalid axis number provided.
+        """
         gmsh.initialize(sys.argv)
         gmsh.model.add("Rushton Turbine")
         gm = gmsh.model.occ
@@ -75,52 +123,50 @@ class RushtonTurbineBuilder:
         hub_offset = self.offset + self.blade_height/2
         connector_offset = hub_offset + self.hub_height
         shaft_offset = connector_offset + self.connector_height
-        match self.axis_alignment:
-            case 0:
-                for dim, tag in gm.getEntities(VOLUME):
-                    gm.rotate(
-                        [(dim, tag)],
-                        x=0,
-                        y=0,
-                        z=0,
-                        ax=0,
-                        ay=1,
-                        az=0,
-                        angle=-np.pi / 2,
-                    )
-                gm.translate([(VOLUME, hub)], dx = hub_offset, dy = 0, dz = 0)
-                gm.translate([(VOLUME, connector)], dx = connector_offset, dy = 0, dz = 0)
-                gm.translate([(VOLUME, shaft)], dx = shaft_offset, dy = 0, dz = 0)
-                for blade in blades:
-                    gm.translate([(VOLUME, blade)], dx = self.offset, dy = 0, dz = 0)
-            case 1:
-                for dim, tag in gm.getEntities(VOLUME):
-                    gm.rotate(
-                        [(dim, tag)],
+        if self.axis_alignment == 0:
+            for dim, tag in gm.getEntities(VOLUME):
+                gm.rotate(
+                    [(dim, tag)],
                     x=0,
                     y=0,
                     z=0,
-                    ax=1,
-                    ay=0,
+                    ax=0,
+                    ay=1,
                     az=0,
                     angle=-np.pi / 2,
                 )
-                gm.translate([(VOLUME, hub)], dx = 0, dy = hub_offset, dz = 0)
-                gm.translate([(VOLUME, connector)], dx = 0, dy = connector_offset, dz = 0)
-                gm.translate([(VOLUME, shaft)], dx = 0, dy = shaft_offset, dz = 0)
-                for blade in blades:
-                    gm.translate([(VOLUME, blade)], dx = 0, dy = self.offset, dz = 0)
+            gm.translate([(VOLUME, hub)], dx = hub_offset, dy = 0, dz = 0)
+            gm.translate([(VOLUME, connector)], dx = connector_offset, dy = 0, dz = 0)
+            gm.translate([(VOLUME, shaft)], dx = shaft_offset, dy = 0, dz = 0)
+            for blade in blades:
+                gm.translate([(VOLUME, blade)], dx = self.offset, dy = 0, dz = 0)
+        elif self.axis_alignment == 1:
+            for dim, tag in gm.getEntities(VOLUME):
+                gm.rotate(
+                    [(dim, tag)],
+                x=0,
+                y=0,
+                z=0,
+                ax=1,
+                ay=0,
+                az=0,
+                angle=-np.pi / 2,
+            )
+            gm.translate([(VOLUME, hub)], dx = 0, dy = hub_offset, dz = 0)
+            gm.translate([(VOLUME, connector)], dx = 0, dy = connector_offset, dz = 0)
+            gm.translate([(VOLUME, shaft)], dx = 0, dy = shaft_offset, dz = 0)
+            for blade in blades:
+                gm.translate([(VOLUME, blade)], dx = 0, dy = self.offset, dz = 0)
 
+        elif self.axis_alignment == 2:  # do nothing as already aligned
+            gm.translate([(VOLUME, hub)], dx = 0, dy = 0, dz = hub_offset)
+            gm.translate([(VOLUME, connector)], dx = 0, dy = 0, dz = connector_offset)
+            gm.translate([(VOLUME, shaft)], dx = 0, dy = 0, dz = shaft_offset)
+            for blade in blades:
+                gm.translate([(VOLUME, blade)], dx = 0, dy = 0, dz = self.offset)
 
-            case 2:  # do nothing as already aligned
-                gm.translate([(VOLUME, hub)], dx = 0, dy = 0, dz = hub_offset)
-                gm.translate([(VOLUME, connector)], dx = 0, dy = 0, dz = connector_offset)
-                gm.translate([(VOLUME, shaft)], dx = 0, dy = 0, dz = shaft_offset)
-                for blade in blades:
-                    gm.translate([(VOLUME, blade)], dx = 0, dy = 0, dz = self.offset)
-
-            case _:
-                raise ValueError("Axis alignment value is *only* 0, 1 or 2!")
+        else:
+            raise ValueError("Axis alignment value is *only* 0, 1 or 2!")
         gm.synchronize()
         gm.fragment(gm.getEntities(SURFACE), gm.getEntities(VOLUME))
         # set physical groups
@@ -133,6 +179,8 @@ class RushtonTurbineBuilder:
         gm.synchronize()
 
     def export(self):
+        """Export .msh and .geo_unrolled (converted to .geo manually) files. 
+           """
         gm = gmsh.model.occ
         msh = gmsh.model.mesh
         gm.synchronize()

@@ -230,5 +230,7 @@ subsection particles
 
     set integrate motion                        = false
     set assemble Navier-Stokes inside particles = false
-
+    set load particles from file                = true
+    set particles file                          = particles
     
+end
