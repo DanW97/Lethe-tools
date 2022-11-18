@@ -64,6 +64,10 @@ class Superquadric:
         Mesh size at each point, by default 1
     view : bool, optional
         Boolean to check whether the mesh is visualised, by default False
+    init : bool, optional
+        Ignore this, by default True
+    ib : bool, optional
+        Ignore this, by default True
     """
 
     def __init__(
@@ -74,8 +78,8 @@ class Superquadric:
         rotation=[0, 0, 0],
         npts=20,
         gr=1,
-        view=False,
-        init=False,
+        view=True,
+        init=True,
         ib=True,
     ) -> None:
         # checking
@@ -393,7 +397,7 @@ class Superquadric:
 
 
 quad = Superquadric(
-    indices=[8, 8, 8], scale=[6.5 / 1000, 6.5 / 1000, 3 / 1000], init=True, view=True
+    indices=[8, 8, 8], scale=[6.5 / 1000, 6.5 / 1000, 3 / 1000]
 )
 quad.draw()
 quad.export()
