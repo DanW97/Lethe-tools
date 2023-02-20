@@ -14,7 +14,7 @@
 # Fluid enters from -x, leaving through +x. Periodic boundaries are set for y and z               
 #
 #
-# Author:   Daniel Weston <dtw545@student.bham.ac.uk>
+# Author:   Daniel Weston <dtw545@bham.ac.uk>
 # Date:     06.03.2022
 # License:  MIT
 #=================================================================================================
@@ -164,20 +164,6 @@ subsection linear solver
     set ilu preconditioner absolute tolerance       = 1e-12
     set ilu preconditioner relative tolerance       = 1.00
 
-    # AMG linear solver, more efficient for > 1,000,000 elements
-    # set method                                      = amg
-    # set max iters                                   = 1000
-    # set max krylov vectors                          = 1000
-    # set relative residual                           = 1e-3
-    # set minimum residual                            = 1e-10
-    # set amg preconditioner ilu fill                 = 0
-    # set amg preconditioner ilu absolute tolerance   = 1e-20
-    # set amg preconditioner ilu relative tolerance   = 1.00
-    # set amg aggregation threshold                   = 1e-12
-    # set amg n cycles                                = 1
-    # set amg w cycles                                = false
-    # set amg smoother sweeps                         = 2
-    # set amg smoother overlap                        = 1
 end
 
 #-------------------------------------------------------------------------------------------------
