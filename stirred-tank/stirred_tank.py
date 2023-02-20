@@ -66,9 +66,11 @@ class RushtonTurbineBuilder:
         blade_depth : float, optional
             Depth (or extension from the hub of the blade), by default 0.01667
         axis_alignment : int, optional
-            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively, by default 1
+            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively,
+            by default 1
         offset : float, optional
-            Distance between the base of the blades and the tank bottom, by default 0.060
+            Distance between the base of the blades and the tank bottom,
+            by default 0.060
         nblades : int, optional
             Number of blades, by default 6
         filepath : str, optional
@@ -114,24 +116,14 @@ class RushtonTurbineBuilder:
         hub = gm.addCylinder(
             x=0, y=0, z=0, dx=0, dy=0, dz=self.hub_height, r=self.hub_radius
         )
-        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x, height to z and the less thin edge to y
+        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x,
+        # height to z and the less thin edge to y
         blades = [
             gm.addBox(
                 x=-self.blade_depth / 2,
                 y=-self.blade_width / 2,
-                z=0,
-                dx=self.blade_depth,        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x, height to z and the less thin edge to y
-        blades = [
-            gm.addBox(
-                x=-self.blade_depth / 2,
-                y=-self.blade_width / 2,
-                z=0.,
+                z=0.0,
                 dx=self.blade_depth,
-                dy=self.blade_width,
-                dz=self.blade_height,
-            )
-            for _ in range(self.nblades)
-        ]
                 dy=self.blade_width,
                 dz=self.blade_height,
             )
