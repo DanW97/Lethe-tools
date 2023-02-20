@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*-coding:utf-8 -*-
-#File    :   packing_generator.py
-#Date    :   03/03/2022
-#Author  :   Daniel Weston
-#Contact :   dtw545@student.bham.ac.uk
+# File    :   packing_generator.py
+# Date    :   03/03/2022
+# Author  :   Daniel Weston
+# Contact :   dtw545@student.bham.ac.uk
 
 import gmsh
 import sys
@@ -41,7 +41,18 @@ class Cylinder:
             Ratio of diamond half-length (half the diagonal length of a square) to cylinder radius
     """
 
-    def __init__(self, radius=0.049, height=0.5, radial_npts=5, height_npts=20, filepath="cylinder", radial_coef=1.0, height_coef=1.0, diamond_coef=1.0, diamond_ratio=0.5) -> None:
+    def __init__(
+        self,
+        radius=0.049,
+        height=0.5,
+        radial_npts=5,
+        height_npts=20,
+        filepath="cylinder",
+        radial_coef=1.0,
+        height_coef=1.0,
+        diamond_coef=1.0,
+        diamond_ratio=0.5,
+    ) -> None:
         # Parameter check
         assert diamond_ratio < 1 and diamond_ratio > 0
         self.radius = radius
@@ -58,7 +69,7 @@ class Cylinder:
         """Draw a cylinder.
 
         This method draws 4 quadrants of the cylinder as separate volumes, and eventually defines the boundary IDs as follows:
-        id     entity 
+        id     entity
         1      walls
         2      -z face
         3      +z face
@@ -73,10 +84,10 @@ class Cylinder:
         arc_south_point = gm.addPoint(0, -self.radius, 0)
         arc_west_point = gm.addPoint(-self.radius, 0, 0)
         # Points defining diamond edges
-        diamond_north_point = gm.addPoint(0, self.radius*self.diamond_ratio, 0)
-        diamond_east_point = gm.addPoint(self.radius*self.diamond_ratio, 0, 0)
-        diamond_south_point = gm.addPoint(0, -self.radius*self.diamond_ratio, 0)
-        diamond_west_point = gm.addPoint(-self.radius*self.diamond_ratio, 0, 0)
+        diamond_north_point = gm.addPoint(0, self.radius * self.diamond_ratio, 0)
+        diamond_east_point = gm.addPoint(self.radius * self.diamond_ratio, 0, 0)
+        diamond_south_point = gm.addPoint(0, -self.radius * self.diamond_ratio, 0)
+        diamond_west_point = gm.addPoint(-self.radius * self.diamond_ratio, 0, 0)
         # Lines from diamond edge to segment points
         trans_line_N = gm.addLine(diamond_north_point, arc_north_point)
         trans_line_E = gm.addLine(diamond_east_point, arc_east_point)
@@ -87,41 +98,85 @@ class Cylinder:
         diamond_line_ES = gm.addLine(diamond_east_point, diamond_south_point)
         diamond_line_SW = gm.addLine(diamond_south_point, diamond_west_point)
         diamond_line_WN = gm.addLine(diamond_west_point, diamond_north_point)
-        diamond_loop    = gm.addCurveLoop([diamond_line_NE, diamond_line_ES, diamond_line_SW, diamond_line_WN])
-        center_face_base= gm.addPlaneSurface([diamond_loop])
-        extruded_center = gm.extrude([(SURFACE, center_face_base)], dx = 0, dy = 0, dz = self.height, numElements=[self.height_npts], recombine=True)
+        diamond_loop = gm.addCurveLoop(
+            [diamond_line_NE, diamond_line_ES, diamond_line_SW, diamond_line_WN]
+        )
+        center_face_base = gm.addPlaneSurface([diamond_loop])
+        extruded_center = gm.extrude(
+            [(SURFACE, center_face_base)],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
         center_face_top = extruded_center[0][1]
-        center_volume   = extruded_center[1][1]
+        center_volume = extruded_center[1][1]
         # Draw segment 1: North - East
         arcNE = gm.addCircleArc(arc_north_point, center_point, arc_east_point)
-        segmentNE = gm.addCurveLoop([trans_line_N, arcNE, -trans_line_E, -diamond_line_NE])
+        segmentNE = gm.addCurveLoop(
+            [trans_line_N, arcNE, -trans_line_E, -diamond_line_NE]
+        )
         faceNE_base = gm.addPlaneSurface([segmentNE])
-        extrudedNE = gm.extrude([(SURFACE, faceNE_base)], dx=0, dy=0, dz=self.height, numElements=[self.height_npts], recombine=True)
+        extrudedNE = gm.extrude(
+            [(SURFACE, faceNE_base)],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
         faceNE_top = extrudedNE[0][1]
         volumeNE = extrudedNE[1][1]
         curved_faceNE = extrudedNE[3][1]
         # Draw segment 2: East - South
-        arcES_base = gm.addCircleArc(
-            arc_east_point, center_point, arc_south_point)
-        segment_ES_base = gm.addCurveLoop([trans_line_E, arcES_base, -trans_line_S, -diamond_line_ES])
+        arcES_base = gm.addCircleArc(arc_east_point, center_point, arc_south_point)
+        segment_ES_base = gm.addCurveLoop(
+            [trans_line_E, arcES_base, -trans_line_S, -diamond_line_ES]
+        )
         face_ES_base = gm.addPlaneSurface([segment_ES_base])
-        extrudedES = gm.extrude([(SURFACE, face_ES_base)], dx=0, dy=0, dz=self.height, numElements=[self.height_npts], recombine=True)
+        extrudedES = gm.extrude(
+            [(SURFACE, face_ES_base)],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
         face_ES_top = extrudedES[0][1]
         volumeES = extrudedES[1][1]
         curved_faceES = extrudedES[3][1]
         # Draw segment 3: South - West
         arcSW_base = gm.addCircleArc(arc_south_point, center_point, arc_west_point)
-        segment_SW_base = gm.addCurveLoop([trans_line_S, arcSW_base, -trans_line_W, -diamond_line_SW])
+        segment_SW_base = gm.addCurveLoop(
+            [trans_line_S, arcSW_base, -trans_line_W, -diamond_line_SW]
+        )
         face_SW_base = gm.addPlaneSurface([segment_SW_base])
-        extrudedSW = gm.extrude([(SURFACE, face_SW_base)], dx=0, dy=0, dz=self.height, numElements=[self.height_npts], recombine=True)
+        extrudedSW = gm.extrude(
+            [(SURFACE, face_SW_base)],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
         face_SW_top = extrudedSW[0][1]
         volumeSW = extrudedSW[1][1]
         curved_faceSW = extrudedSW[3][1]
         # Draw segment 4: West - North
         arcWN_base = gm.addCircleArc(arc_west_point, center_point, arc_north_point)
-        segment_WN_base = gm.addCurveLoop([trans_line_W, arcWN_base, -trans_line_N, -diamond_line_WN])
+        segment_WN_base = gm.addCurveLoop(
+            [trans_line_W, arcWN_base, -trans_line_N, -diamond_line_WN]
+        )
         face_WN_base = gm.addPlaneSurface([segment_WN_base])
-        extrudedWN = gm.extrude([(SURFACE, face_WN_base)], dx=0, dy=0, dz=self.height, numElements=[self.height_npts], recombine=True)
+        extrudedWN = gm.extrude(
+            [(SURFACE, face_WN_base)],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
         face_WN_top = extrudedWN[0][1]
         volumeWN = extrudedWN[1][1]
         curved_faceWN = extrudedWN[3][1]
@@ -129,54 +184,59 @@ class Cylinder:
         # Define transfinite behaviour
         msh = gm.mesh
         # Shared lines
-        msh.setTransfiniteCurve(
-            trans_line_N, self.radial_npts, coef=self.radial_coef)
-        msh.setTransfiniteCurve(
-            trans_line_E, self.radial_npts, coef=self.radial_coef)
-        msh.setTransfiniteCurve(
-            trans_line_S, self.radial_npts, coef=self.radial_coef)
-        msh.setTransfiniteCurve(
-            trans_line_W, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(trans_line_N, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(trans_line_E, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(trans_line_S, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(trans_line_W, self.radial_npts, coef=self.radial_coef)
         # Segment 1: North - East
-        msh.setTransfiniteCurve(
-            arcNE, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(arcNE, self.radial_npts, coef=self.radial_coef)
         msh.setTransfiniteSurface(faceNE_base)
         msh.setRecombine(SURFACE, faceNE_base)
         # Segment 2: East - South
-        msh.setTransfiniteCurve(
-            arcES_base, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(arcES_base, self.radial_npts, coef=self.radial_coef)
         msh.setTransfiniteSurface(face_ES_base)
         msh.setRecombine(SURFACE, face_ES_base)
         # Segment 3: South - West
-        msh.setTransfiniteCurve(
-            arcSW_base, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(arcSW_base, self.radial_npts, coef=self.radial_coef)
         msh.setTransfiniteSurface(face_SW_base)
         msh.setRecombine(SURFACE, face_SW_base)
         # Segment 4: West - North
-        msh.setTransfiniteCurve(
-            arcWN_base, self.radial_npts, coef=self.radial_coef)
+        msh.setTransfiniteCurve(arcWN_base, self.radial_npts, coef=self.radial_coef)
         msh.setTransfiniteSurface(face_WN_base)
         msh.setRecombine(SURFACE, face_WN_base)
         # Center diamond
-        msh.setTransfiniteCurve(diamond_line_NE, self.radial_npts, coef=self.diamond_coef)
-        msh.setTransfiniteCurve(diamond_line_ES, self.radial_npts, coef=self.diamond_coef)
-        msh.setTransfiniteCurve(diamond_line_SW, self.radial_npts, coef=self.diamond_coef)
-        msh.setTransfiniteCurve(diamond_line_WN, self.radial_npts, coef=self.diamond_coef)
+        msh.setTransfiniteCurve(
+            diamond_line_NE, self.radial_npts, coef=self.diamond_coef
+        )
+        msh.setTransfiniteCurve(
+            diamond_line_ES, self.radial_npts, coef=self.diamond_coef
+        )
+        msh.setTransfiniteCurve(
+            diamond_line_SW, self.radial_npts, coef=self.diamond_coef
+        )
+        msh.setTransfiniteCurve(
+            diamond_line_WN, self.radial_npts, coef=self.diamond_coef
+        )
         msh.setTransfiniteSurface(center_face_base)
         msh.setRecombine(SURFACE, center_face_base)
         # Define physical groups for lethe
         gr1 = gm.addPhysicalGroup(
-            SURFACE, [curved_faceNE, curved_faceES, curved_faceSW, curved_faceWN])
+            SURFACE, [curved_faceNE, curved_faceES, curved_faceSW, curved_faceWN]
+        )
         gr2 = gm.addPhysicalGroup(
-            SURFACE, [faceNE_base, face_ES_base, face_SW_base, face_WN_base, center_face_base])
+            SURFACE,
+            [faceNE_base, face_ES_base, face_SW_base, face_WN_base, center_face_base],
+        )
         gr3 = gm.addPhysicalGroup(
-            SURFACE, [faceNE_top, face_ES_top, face_SW_top, face_WN_top, center_face_top])
+            SURFACE,
+            [faceNE_top, face_ES_top, face_SW_top, face_WN_top, center_face_top],
+        )
         gr4 = gm.addPhysicalGroup(
-            VOLUME, [volumeNE, volumeES, volumeSW, volumeWN, center_volume])
+            VOLUME, [volumeNE, volumeES, volumeSW, volumeWN, center_volume]
+        )
         gm.synchronize()
 
         self.export()
-
 
     def export(self):
         """unclean way to add all the hard-coded stuff in, and rename the file"""
@@ -189,11 +249,12 @@ class Cylinder:
         gmsh.model.geo.synchronize()
         gmsh.write(f"{self.filepath}.msh")
         import os
+
         os.replace(f"{raw_file}", f"{new_file}")
 
     def view(self):
         """Visualise the geo file"""
-        if '-nopopup' not in sys.argv:
+        if "-nopopup" not in sys.argv:
             gmsh.fltk.run()
 
 

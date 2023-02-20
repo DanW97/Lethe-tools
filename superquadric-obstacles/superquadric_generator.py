@@ -16,6 +16,7 @@ CURVE = 1
 SURFACE = 2
 VOLUME = 3
 
+
 # using parameterised functions from: https://en.wikipedia.org/wiki/Superquadrics
 # auxilliary functions
 def f(w, m):
@@ -396,8 +397,6 @@ class Superquadric:
         gmsh.finalize()
 
 
-quad = Superquadric(
-    indices=[8, 8, 8], scale=[6.5 / 1000, 6.5 / 1000, 3 / 1000]
-)
+quad = Superquadric(indices=[8, 8, 8], scale=[6.5 / 1000, 6.5 / 1000, 3 / 1000])
 quad.draw()
 quad.export()
