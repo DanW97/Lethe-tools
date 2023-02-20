@@ -119,7 +119,7 @@ class RushtonTurbineBuilder:
             gm.addBox(
                 x=-self.blade_depth / 2,
                 y=-self.blade_width / 2,
-                z=0,
+                z=0.,
                 dx=self.blade_depth,
                 dy=self.blade_width,
                 dz=self.blade_height,
