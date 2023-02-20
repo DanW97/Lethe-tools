@@ -114,7 +114,29 @@ class RushtonTurbineBuilder:
         hub = gm.addCylinder(
             x=0, y=0, z=0, dx=0, dy=0, dz=self.hub_height, r=self.hub_radius
         )
-
+        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x, height to z and the less thin edge to y
+        blades = [
+            gm.addBox(
+                x=-self.blade_depth / 2,
+                y=-self.blade_width / 2,
+                z=0,
+                dx=self.blade_depth,        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x, height to z and the less thin edge to y
+        blades = [
+            gm.addBox(
+                x=-self.blade_depth / 2,
+                y=-self.blade_width / 2,
+                z=0.,
+                dx=self.blade_depth,
+                dy=self.blade_width,
+                dz=self.blade_height,
+            )
+            for _ in range(self.nblades)
+        ]
+                dy=self.blade_width,
+                dz=self.blade_height,
+            )
+            for _ in range(self.nblades)
+        ]
         angles = np.linspace(0, 2 * np.pi, self.nblades, endpoint=False)
         for blade, angle in zip(blades, angles):
             dimtags = [(VOLUME, blade)]
