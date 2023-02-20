@@ -1,8 +1,8 @@
 # Unnecessary files
 .vscode
-*/*.stp
-*/*.geo
-*/*.msh
+**/*.stp
+**/*.geo
+**/*.msh
 
 **/packingrun*
 **/packed_sphere*
