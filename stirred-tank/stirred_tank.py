@@ -19,36 +19,37 @@ VOLUME = 3
 
 class StirredTankBuilder:
     """
-        Class that generates hex meshes of stirred tanks with N number of baffles.
+    Class that generates hex meshes of stirred tanks with N number of baffles.
 
-        Parameters
-        ----------
-        radius : float, optional
-            Tank radius, by default 0.1
-        height : float, optional
-            Tank height, by default 0.2
-        nbaffles : int, optional
-            Number of baffles, by default 4
-        pts_mode : str, optional
-            Mode for number of vertical points calculation, choices are "number" which is the user-specified number of nodes or "physical" which takes a physical spacing and calculates the number of nodes to achieve this. For the latter, the spacing *must* be an integer multiple of the tank height, by default "number"
-        height_spacing : int, optional
-            Number of nodes if pts_mode == "number", or spacing if pts_mode == "physical", by default 20
-        filepath : str, optional
-            Name of msh and geo files created by this class, by default "stirred_tank"
-        axis_alignment : int, optional
-            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively, by default 1
-        view : bool, optional
-            Display the resultant mesh in gmsh, by default True
-        baffle_width : float, optional
-            Baffle thickness, by default 0.00569
-        baffle_depth : float, optional
-            Baffle depth, or protrusion from the wall, by default 0.01996
+    Parameters
+    ----------
+    radius : float, optional
+        Tank radius, by default 0.1
+    height : float, optional
+        Tank height, by default 0.2
+    nbaffles : int, optional
+        Number of baffles, by default 4
+    pts_mode : str, optional
+        Mode for number of vertical points calculation, choices are "number" which is the user-specified number of nodes or "physical" which takes a physical spacing and calculates the number of nodes to achieve this. For the latter, the spacing *must* be an integer multiple of the tank height, by default "number"
+    height_spacing : int, optional
+        Number of nodes if pts_mode == "number", or spacing if pts_mode == "physical", by default 20
+    filepath : str, optional
+        Name of msh and geo files created by this class, by default "stirred_tank"
+    axis_alignment : int, optional
+        Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively, by default 1
+    view : bool, optional
+        Display the resultant mesh in gmsh, by default True
+    baffle_width : float, optional
+        Baffle thickness, by default 0.00569
+    baffle_depth : float, optional
+        Baffle depth, or protrusion from the wall, by default 0.01996
 
-        Raises
-        ------
-        ValueError
-            Exception raised if pts_mode == "physical" and the height_spacing value is *not* an integer multiple of the height value.
-        """
+    Raises
+    ------
+    ValueError
+        Exception raised if pts_mode == "physical" and the height_spacing value is *not* an integer multiple of the height value.
+    """
+
     def __init__(
         self,
         radius=0.1,
@@ -217,8 +218,7 @@ class StirredTankBuilder:
         gm.synchronize()
 
     def export(self):
-        """Export .msh and .geo_unrolled (converted to .geo manually) files. 
-           """
+        """Export .msh and .geo_unrolled (converted to .geo manually) files."""
         gm = gmsh.model.geo
         msh = gmsh.model.mesh
         gm.synchronize()
@@ -240,7 +240,7 @@ class StirredTankBuilder:
 
         os.replace(f"{raw_file}", f"{new_file}")
         if self.view:
-            self._view()       
+            self._view()
 
     def _view(self):
         if "-nopopup" not in sys.argv:

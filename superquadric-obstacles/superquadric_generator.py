@@ -396,8 +396,6 @@ class Superquadric:
         gmsh.finalize()
 
 
-quad = Superquadric(
-    indices=[8, 8, 8], scale=[6.5 / 1000, 6.5 / 1000, 3 / 1000]
-)
+quad = Superquadric(indices=[8, 8, 8], scale=[6.5 / 1000, 6.5 / 1000, 3 / 1000])
 quad.draw()
 quad.export()
