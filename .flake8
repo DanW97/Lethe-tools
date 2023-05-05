@@ -1,8 +1,9 @@
 [flake8]
-ignore = E303, E271, E272, W504, E251
+ignore = E303, E271, E272, W504, E251, W503
 max-line-length = 88
 # E303: too many blank lines
 # E271: multiple spaces after keyword
 # E272: multiple spaces before keyword
+# W503: line break before binary operator
 # W504: line break after binary operator
 # E251: unexpected spaces around keyword / parameter equals

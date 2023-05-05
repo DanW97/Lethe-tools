@@ -17,140 +17,158 @@ SURFACE = 2
 VOLUME = 3
 
 
-class RushtonTurbineBuilder:
+class StirredTankBuilder:
+    """
+    Class that generates hex meshes of stirred tanks with N number of baffles.
+
+    Parameters
+    ----------
+    radius : float, optional
+        Tank radius, by default 0.1
+    height : float, optional
+        Tank height, by default 0.2
+    nbaffles : int, optional
+        Number of baffles, by default 4
+    pts_mode : str, optional
+        Mode for number of vertical points calculation, choices are "number" which is
+        the user-specified number of nodes or "physical" which takes a physical spacing
+        and calculates the number of nodes to achieve this. For the latter, the spacing
+        *must* be an integer multiple of the tank height, by default "number"
+    height_spacing : int, optional
+        Number of nodes if pts_mode == "number", or spacing if pts_mode == "physical",
+        by default 20
+    filepath : str, optional
+        Name of msh and geo files created by this class, by default "stirred_tank"
+    axis_alignment : int, optional
+        Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively, by
+        default 1
+    view : bool, optional
+        Display the resultant mesh in gmsh, by default True
+    baffle_width : float, optional
+        Baffle thickness, by default 0.00569
+    baffle_depth : float, optional
+        Baffle depth, or protrusion from the wall, by default 0.01996
+
+    Raises
+    ------
+    ValueError
+        Exception raised if pts_mode == "physical" and the height_spacing value is
+        *not* an integer multiple of the height value.
+    """
+
     def __init__(
         self,
-        shaft_height=0.12333,
-        shaft_radius=0.00375,
-        connector_height=0.00956,
-        connector_radius=0.00625,
-        hub_height=0.00058,
-        hub_radius=0.025,
-        blade_height=0.01333,
-        blade_width=0.00089,
-        blade_depth=0.01667,
+        radius=0.1,
+        height=0.2,
+        nbaffles=4,
+        pts_mode="number",
+        height_spacing=20,
+        filepath="stirred_tank",
         axis_alignment=1,
-        offset=0.060,
-        nblades=6,
-        filepath="rushton",
         view=True,
+        baffle_width=0.00569,
+        baffle_depth=0.01996,
     ) -> None:
-        """
-        Class to build a Rushton turbine, with given dimensions.
-        This class assumes that the turbine is made of 3 cylinders:
-
-        1) The main shaft
-        2) A "connector" that is wider than the cylinder, bridging the shaft
-        and the hub that the blades attach to.
-        3) The hub, where the blades are mounted to. N.B: it is assumed that the blades'
-        centres lie on the edge of the hub.
-
-        Parameters
-        ----------
-        shaft_height : float, optional
-            Height of the shaft (neglecting the blade hub), by default 0.12333
-        shaft_radius : float, optional
-            Radius of the shaft, by default 0.00375
-        connector_height : float, optional
-            Height of the connector, by default 0.00956
-        connector_radius : float, optional
-            Radius of the connector, by default 0.00625
-        hub_height : float, optional
-            Height of the hub, by default 0.00058
-        hub_radius : float, optional
-            Radius of the hub, by default 0.025
-        blade_height : float, optional
-            Height of the blade, by default 0.01333
-        blade_width : float, optional
-            Width (or thickness) of the blade, by default 0.00089
-        blade_depth : float, optional
-            Depth (or extension from the hub of the blade), by default 0.01667
-        axis_alignment : int, optional
-            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively,
-            by default 1
-        offset : float, optional
-            Distance between the base of the blades and the tank bottom,
-            by default 0.060
-        nblades : int, optional
-            Number of blades, by default 6
-        filepath : str, optional
-            Name of msh and geo files created by this class, by default "rushton"
-        view : bool, optional
-            Display the resultant mesh in gmsh, by default True
-        """
-        self.shaft_height = shaft_height
-        self.shaft_radius = shaft_radius
-        self.connector_height = connector_height
-        self.connector_radius = connector_radius
-        self.hub_height = hub_height
-        self.hub_radius = hub_radius
-        self.blade_height = blade_height
-        self.blade_width = blade_width
-        self.blade_depth = blade_depth
-        self.axis_alignment = axis_alignment
-        self.offset = offset  # height of impeller from bottom of blade to tank bottom
-        self.nblades = nblades
+        if pts_mode == "number":
+            self.height_spacing = height_spacing
+        elif pts_mode == "physical":
+            if height % height_spacing == 0:
+                self.height_spacing = int(height / height_spacing)
+            else:
+                raise ValueError(
+                    "The height must be wholly divisable by the height spacing!"
+                )
         self.filepath = filepath
+        self.radius = radius
+        self.height = height
+        self.nbaffles = nbaffles
+        self.axis_alignment = axis_alignment
+        self.baffle_angles = np.linspace(0, 2 * np.pi, self.nbaffles, endpoint=False)
+        self.baffle_origins = np.zeros((3, self.nbaffles))
+        self.baffle_coordinates = np.zeros((3, self.nbaffles, 4))
+        self.baffle_width = baffle_width
+        self.baffle_depth = baffle_depth
         self.view = view
 
     def draw(self):
         """
-        Draw the turbine.
+        Draw the tank
 
         Raises
         ------
         ValueError
-            Exception raised for invalid axis number provided.
+            Raised if incorrect axis_alignment parameter given.
         """
         gmsh.initialize(sys.argv)
-        gmsh.model.add("Rushton Turbine")
-        gm = gmsh.model.occ
-        # this assembly consists of 3 cylinders and n boxes, all mated
-        # draw cylindrical parts
-        shaft = gm.addCylinder(
-            x=0, y=0, z=0, dx=0, dy=0, dz=self.shaft_height, r=self.shaft_radius
-        )
-        connector = gm.addCylinder(
-            x=0, y=0, z=0, dx=0, dy=0, dz=self.connector_height, r=self.connector_radius
-        )
-        hub = gm.addCylinder(
-            x=0, y=0, z=0, dx=0, dy=0, dz=self.hub_height, r=self.hub_radius
-        )
-        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x,
-        # height to z and the less thin edge to y
-        blades = [
-            gm.addBox(
-                x=-self.blade_depth / 2,
-                y=-self.blade_width / 2,
-                z=0.0,
-                dx=self.blade_depth,
-                dy=self.blade_width,
-                dz=self.blade_height,
+        gmsh.model.add("Stirred Tank")
+        gm = gmsh.model.geo
+        # draw baffles
+        # we start at 0 rad and draw baffles anti-clockwise
+        # list of lists so we can maintain structure of baffle points to aid drawing
+        baffle_pts = []
+        curves = []
+        # assign a point to the tank centre
+        center = gm.addPoint(0.0, 0.0, 0.0)
+        # set origin coordinates for baffles
+        self.baffle_origins[0, :] += self.radius * np.cos(self.baffle_angles)
+        self.baffle_origins[1, :] += self.radius * np.sin(self.baffle_angles)
+        # now assign 4 pts corresponding to the 4 corners of the baffle
+        # from 0 rad:
+        # 1 ----------- 0
+        #   |
+        #   |
+        # 2 ----------- 3
+        for i in range(self.nbaffles):
+            baffle = []
+            unit_vec = self.baffle_origins[:, i] / np.sqrt(
+                sum(self.baffle_origins[:, i] ** 2)
             )
-            for _ in range(self.nblades)
-        ]
-        angles = np.linspace(0, 2 * np.pi, self.nblades, endpoint=False)
-        for blade, angle in zip(blades, angles):
-            dimtags = [(VOLUME, blade)]
-            # rotate each blade
-            gm.rotate(dimtags, x=0, y=0, z=0, ax=0, ay=0, az=1, angle=angle)
-            # translate to hub edge
-            gm.translate(
-                dimtags,
-                dx=self.hub_radius * np.cos(angle),
-                dy=self.hub_radius * np.sin(angle),
-                dz=0,
+            normal_unit_vec = np.array([-unit_vec[1], unit_vec[0]])  # only need xy part
+            self.baffle_coordinates[0:2, i, 0] = (
+                self.baffle_origins[0:2, i] + 0.5 * self.baffle_width * normal_unit_vec
             )
+            self.baffle_coordinates[0:2, i, 1] = (
+                self.baffle_origins[0:2, i]
+                + 0.5 * self.baffle_width * normal_unit_vec
+                - unit_vec[0:2] * self.baffle_depth
+            )
+            self.baffle_coordinates[0:2, i, 2] = (
+                self.baffle_origins[0:2, i]
+                - 0.5 * self.baffle_width * normal_unit_vec
+                - unit_vec[0:2] * self.baffle_depth
+            )
+            self.baffle_coordinates[0:2, i, 3] = (
+                self.baffle_origins[0:2, i] - 0.5 * self.baffle_width * normal_unit_vec
+            )
+            # assign points
+            for j in range(4):
+                baffle.append(
+                    gm.addPoint(
+                        self.baffle_coordinates[0, i, j],
+                        self.baffle_coordinates[1, i, j],
+                        self.baffle_coordinates[2, i, j],
+                    )
+                )
+            baffle_pts.append(baffle)
+        curves = []
+        for i in range(self.nbaffles):
+            # for each baffle, join 3-2 2-1 1-0 and then
+            # curve from 0 to 3 on next baffle
+            lines = [
+                gm.addLine(baffle_pts[i][3 - j], baffle_pts[i][2 - j]) for j in range(3)
+            ]
+            if i < self.nbaffles - 1:
+                arc_03 = gm.addCircleArc(baffle_pts[i][0], center, baffle_pts[i + 1][3])
+            else:
+                arc_03 = gm.addCircleArc(baffle_pts[i][0], center, baffle_pts[0][3])
+            curves.extend([*lines, arc_03])
+        curve_loop = gm.addCurveLoop(curves)
+        surface = gm.addPlaneSurface([curve_loop])
         gm.synchronize()
-        # align everything to the correct axis and
-        # raise each object by their relative offsets
-        hub_offset = self.offset + self.blade_height / 2
-        connector_offset = hub_offset + self.hub_height
-        shaft_offset = connector_offset + self.connector_height
-        if self.axis_alignment == 0:
-            for dim, tag in gm.getEntities(VOLUME):
+        match self.axis_alignment:
+            case 0:
                 gm.rotate(
-                    [(dim, tag)],
+                    [(SURFACE, surface)],
                     x=0,
                     y=0,
                     z=0,
@@ -159,15 +177,17 @@ class RushtonTurbineBuilder:
                     az=0,
                     angle=-np.pi / 2,
                 )
-            gm.translate([(VOLUME, hub)], dx=hub_offset, dy=0, dz=0)
-            gm.translate([(VOLUME, connector)], dx=connector_offset, dy=0, dz=0)
-            gm.translate([(VOLUME, shaft)], dx=shaft_offset, dy=0, dz=0)
-            for blade in blades:
-                gm.translate([(VOLUME, blade)], dx=self.offset, dy=0, dz=0)
-        elif self.axis_alignment == 1:
-            for dim, tag in gm.getEntities(VOLUME):
+                gm.extrude(
+                    [(SURFACE, surface)],
+                    dx=self.height,
+                    dy=0,
+                    dz=0,
+                    numElements=[self.height_spacing],
+                    recombine=True,
+                )
+            case 1:
                 gm.rotate(
-                    [(dim, tag)],
+                    [(SURFACE, surface)],
                     x=0,
                     y=0,
                     z=0,
@@ -176,36 +196,37 @@ class RushtonTurbineBuilder:
                     az=0,
                     angle=-np.pi / 2,
                 )
-            gm.translate([(VOLUME, hub)], dx=0, dy=hub_offset, dz=0)
-            gm.translate([(VOLUME, connector)], dx=0, dy=connector_offset, dz=0)
-            gm.translate([(VOLUME, shaft)], dx=0, dy=shaft_offset, dz=0)
-            for blade in blades:
-                gm.translate([(VOLUME, blade)], dx=0, dy=self.offset, dz=0)
-                _, hub = gm.fuse([(VOLUME, hub)], [(VOLUME, blade)])[0][0]
-
-        elif self.axis_alignment == 2:  # do nothing as already aligned
-            gm.translate([(VOLUME, hub)], dx=0, dy=0, dz=hub_offset)
-            gm.translate([(VOLUME, connector)], dx=0, dy=0, dz=connector_offset)
-            gm.translate([(VOLUME, shaft)], dx=0, dy=0, dz=shaft_offset)
-            for blade in blades:
-                gm.translate([(VOLUME, blade)], dx=0, dy=0, dz=self.offset)
-
-        else:
-            raise ValueError("Axis alignment value is *only* 0, 1 or 2!")
+                gm.extrude(
+                    [(SURFACE, surface)],
+                    dx=0,
+                    dy=self.height,
+                    dz=0,
+                    numElements=[self.height_spacing],
+                    recombine=True,
+                )
+            case 2:  # only extrude
+                gm.extrude(
+                    [(SURFACE, surface)],
+                    dx=0,
+                    dy=0,
+                    dz=self.height,
+                    numElements=[self.height_spacing],
+                    recombine=True,
+                )
+            case _:
+                raise ValueError("Axis alignment value is *only* 0, 1 or 2!")
         gm.synchronize()
-        # gm.fragment(gm.getEntities(SURFACE), gm.getEntities(VOLUME))
-        # set physical groups
-        gmsh.model.addPhysicalGroup(
+        gm.addPhysicalGroup(
             SURFACE, [tag for _, tag in gmsh.model.getEntities(SURFACE)], name="1"
         )
-        gmsh.model.addPhysicalGroup(
+        gm.addPhysicalGroup(
             VOLUME, [tag for _, tag in gmsh.model.getEntities(VOLUME)], name="1"
         )
         gm.synchronize()
 
     def export(self):
         """Export .msh and .geo_unrolled (converted to .geo manually) files."""
-        gm = gmsh.model.occ
+        gm = gmsh.model.geo
         msh = gmsh.model.mesh
         gm.synchronize()
         gmsh.option.setNumber("Mesh.Smoothing", 100)
@@ -235,6 +256,6 @@ class RushtonTurbineBuilder:
             gmsh.fltk.run()
 
 
-turbine = RushtonTurbineBuilder(axis_alignment=1, filepath="mesh/rushton")
-turbine.draw()
-turbine.export()
+tank = StirredTankBuilder()
+tank.draw()
+tank.export()

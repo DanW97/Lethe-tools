@@ -5,6 +5,8 @@
 # Author  :   Daniel Weston
 # Contact :   dtw545@student.bham.ac.uk
 
+from __future__ import annotations
+
 from pathlib import Path
 import coexist
 
@@ -16,8 +18,11 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 
 class PackingGenerator:
-    """Class to generate packings of particles with given volume fraction and PSD. This class also builds Lethe .prm files that simulate a range of Reynolds numbers
-    to calculate the effect that Reynolds number and packing fraction have on the drag coefficient.
+    """
+    Class to generate packings of particles with given volume fraction and PSD.
+    This class also builds Lethe .prm files that simulate a range of Reynolds numbers
+    to calculate the effect that Reynolds number and packing fraction have on the
+    drag coefficient.
 
         Parameters
         ----------
@@ -34,7 +39,8 @@ class PackingGenerator:
         liggghts_filename : str, optional
             Filename pattern for each set of particle positions, by default "packingrun"
         liggghts_folder : str, optional
-            Filename pattern for each set of particle positions, by default "packingsims"
+            Filename pattern for each set of particle positions,
+            by default "packingsims"
         sim_filename : str, optional
             Filename pattern for each simulation, by default "packed_spheres"
         sim_folder : str, optional
@@ -72,22 +78,27 @@ class PackingGenerator:
     def psd(
         self,
         discrete: bool = True,
-        mu: float = None,
-        sigma: float = None,
-        N: float = None,
+        mu: float = 0.001,
+        sigma: float = 0.0005,
+        N: int = 30,
     ):
-        """Create the required PSD for LIGGGHTS to pack particles. This method sets the *radius* for each particle.
+        """Create the required PSD for LIGGGHTS to pack particles.
+
+        This method sets the *radius* for each particle.
 
         Parameters
         ----------
         discrete : bool, optional
-            True if a discrete psd is required, False if a Gaussian psd is required, by default True
+            True if a discrete psd is required, False if a Gaussian psd is
+            required, by default True
         mu : float, optional
-            Mean of the psd, only required if discrete == False, by default None
+            Mean of the psd, only required if discrete == False, by default 0.001
         sigma : float, optional
-            Standard deviation of the psd, only required if discrete == False, by default None
-        N : float, optional
-            Number of sizes to draw from the psd, only required if discrete == False, by default None
+            Standard deviation of the psd, only required if discrete == False,
+            by default 0.0005
+        N : int, optional
+            Number of sizes to draw from the psd, only required
+            if discrete == False, by default 30
         """
         if discrete:
             self.radii = np.array(
@@ -104,7 +115,9 @@ class PackingGenerator:
 
     def generate_run_parameters(self):
         """
-        Create the list of phi, Re from sobol sampling to form the required .prm files. The created setpoints' first column is phi, the other is Re.
+        Create the list of phi, Re from sobol sampling to form the required .prm files.
+
+        The created setpoints' first column is phi, the other is Re.
         """
         sampler = qmc.Sobol(d=2, scramble=False)
         sample = sampler.random_base2(self.m)
@@ -126,7 +139,8 @@ class PackingGenerator:
         primes = [nextprime(10000)]  # liggghts requires seeds > 10000
         for i in range(
             nprimes
-        ):  # generate nprimes more, so nprimes-1 goes to the particles and the last for insertion
+        ):  # generate nprimes more, so nprimes-1 goes to the particles and the last
+            # for insertion
             primes.append(nextprime(primes[i]))
         self.end_prime = primes[-1]
         self.packingpaths = []
@@ -137,12 +151,14 @@ class PackingGenerator:
                     self.liggghts_folder, self.liggghts_filename + f"_{i}.sim"
                 )
                 self.packingpaths.append(filepath)
-                future = exe.submit(self._write_liggghts_sim, i, phi, nprimes, primes)
+                future = exe.submit(
+                    self._write_liggghts_sim, i, phi, nprimes, primes  # type: ignore
+                )
                 futures.append(future)
             for f in futures:
                 f.result()
 
-    def _write_liggghts_sim(self, i: int, phi: float, nprimes: int, primes: int):
+    def _write_liggghts_sim(self, i: int, phi: float, nprimes: int, primes: list[int]):
         """Private method called by concurrent.futures for each packing value.
 
         Parameters
@@ -162,7 +178,11 @@ class PackingGenerator:
             header = header[8:-1]
             # domain setup
             domain = [
-                f"region domain block {-self.Vx} {self.Vx} {-self.Vy} {self.Vy} {-self.Vz} {self.Vz} units box\n",
+                (
+                    "region domain block"
+                    f" {-self.Vx} {self.Vx} {-self.Vy} {self.Vy} {-self.Vz} {self.Vz} "
+                    "units box\n"
+                ),
                 "create_box 1 domain\n",
                 f"neighbor {np.min(self.radii)} bin\n",
             ]
@@ -173,34 +193,45 @@ class PackingGenerator:
             )  # cut some lookup time if we have some crazy normal distribution scenario
             for j, (radius, seed) in enumerate(zip(self.radii, primes)):
                 app(
-                    f"fix pts{j} all particletemplate/sphere {seed} atom_type 1 density constant 1 radius constant {radius}\n"
+                    f"fix pts{j} all particletemplate/sphere {seed} atom_type 1 density"
+                    f" constant 1 radius constant {radius}\n"
                 )
             liggghts_psd = [
                 f"pts{j} {frac} " for j, frac in enumerate(self.size_fractions)
             ]
             psd_cmd = (
-                f"fix pdd1 all particledistribution/discrete {self.end_prime} {nprimes} "
+                "fix pdd1 all particledistribution/discrete"
+                f" {self.end_prime} {nprimes} "
                 + "".join(psd for psd in liggghts_psd)
                 + "\n"
             )
             particle_info = [particle for particle in particle_templates]
             particle_info.append(psd_cmd)
             # particle insertion
-            # Inserting by volume fraction is further from target than numerical insertion
+            # Inserting by volume fraction is further from target than
+            # numerical insertion
             insertion = [
-                f"fix ins all insert/pack seed {nextprime(self.end_prime)} distributiontemplate pdd1 insert_every once overlapcheck yes all_in yes region domain volumefraction_region {phi} ntry_mc 10000000\n",
+                (
+                    "fix ins all insert/pack seed"
+                    f" {nextprime(self.end_prime)} distributiontemplate pdd1"
+                    " insert_every once overlapcheck yes all_in yes region domain"
+                    f" volumefraction_region {phi} ntry_mc 10000000\n"
+                ),
                 "run 2\n",
             ]
             with open(self.packingpaths[i], "w") as sim:
                 sim.writelines(
-                    "#=================================================================================================\n"
+                    "#================================================================="
+                    "================================\n"
                 )
                 sim.writelines(
-                    f"# LIGGGHTS script to pack particles with volume fraction target {phi}\n"
+                    "# LIGGGHTS script to pack particles with volume fraction target"
+                    f" {phi}\n"
                 )
                 sim.writelines(metadata)
                 sim.writelines(
-                    "#=================================================================================================\n\n"
+                    "#================================================================="
+                    "================================\n\n"
                 )
                 sim.writelines(header)
                 sim.writelines(domain)
@@ -227,25 +258,27 @@ class PackingGenerator:
         self._write_particle_file(pos, rad, i)
         self._write_prm(real_phi, i)
 
-    def _write_particle_file(self, pos: list[float], rad: float, suffix: int):
+    def _write_particle_file(self, pos: np.ndarray, rad: np.ndarray, suffix: int):
         """Write Lethe particle file.
 
         Parameters
         ----------
-        pos : list[float]
+        pos : np.ndarray
             3D particle position.
-        rad : float
+        rad : np.ndarray
             Particle radius.
         suffix : int
             Numbered identifier for corresponding sim.
         """
         with open(self.particle_file, "w") as f:
             f.write(
-                "type shape_argument_0 p_x p_y p_z v_x v_y v_z omega_x omega_y omega_z\n"
+                "type shape_argument_0 p_x p_y p_z v_x v_y v_z omega_x omega_y"
+                " omega_z\n"
             )
             for i, (position, radius) in enumerate(zip(pos, rad)):
                 f.write(
-                    f"sphere, {radius}, {position[0]}, {position[1]}, {position[2]}, 0, 0, 0, 0, 0, 0\n"
+                    f"sphere, {radius}, {position[0]}, {position[1]}, {position[2]}, 0,"
+                    " 0, 0, 0, 0, 0\n"
                 )
 
     def _write_prm(self, real_phi: float, suffix: int, clean: bool = True):
@@ -254,7 +287,8 @@ class PackingGenerator:
         Parameters
         ----------
         real_phi : float
-            Actual volume fraction, this may be different to self.phi[suffix] due to limitations in the packing algorithm.
+            Actual volume fraction, this may be different to self.phi[suffix] due to
+            limitations in the packing algorithm.
         suffix : int
             File suffix.
         clean : bool, optional
@@ -265,16 +299,20 @@ class PackingGenerator:
         kinematic_viscosity = 1e-6  # water
         with open(self.sim_header_file, "r") as f:
             header = f.readlines()
-            header[
-                15
-            ] = f"# Volume fraction = {real_phi}, Reynolds number = {self.setpoints[suffix,1]}\n"
-            header[
-                36
-            ] = f"    set output path                     = ./results_{suffix}/            # Output directory\n"
+            header[15] = (
+                f"# Volume fraction = {real_phi}, Reynolds number ="
+                f" {self.setpoints[suffix,1]}\n"
+            )
+            header[36] = (
+                f"    set output path                     = ./results_{suffix}/        "
+                "    # Output directory\n"
+            )
             # make box dimensions 10x the packed cube
-            header[
-                106
-            ] = f"    set grid arguments                  = {-2*self.Vx},{-2*self.Vy},{-2*self.Vz} : {2*self.Vx},{2*self.Vy},{2*self.Vz} : true\n"
+            header[106] = (
+                "    set grid arguments                  ="
+                f" {-2*self.Vx},{-2*self.Vy},{-2*self.Vz} :"
+                f" {2*self.Vx},{2*self.Vy},{2*self.Vz} : true\n"
+            )
             # calculate inlet velocity
             cross_section = self.Vy * self.Vz
             reynolds_number = self.setpoints[suffix, 1]

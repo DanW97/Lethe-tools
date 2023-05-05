@@ -66,9 +66,11 @@ class RushtonTurbineBuilder:
         blade_depth : float, optional
             Depth (or extension from the hub of the blade), by default 0.01667
         axis_alignment : int, optional
-            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively, by default 1
+            Axis alignment of the impeller, either 0, 1 or 2 for x, y or z respectively
+            , by default 1
         offset : float, optional
-            Distance between the base of the blades and the tank bottom, by default 0.060
+            Distance between the base of the blades and the tank bottom,
+            by default 0.060
         nblades : int, optional
             Number of blades, by default 6
         filepath : str, optional
@@ -114,7 +116,8 @@ class RushtonTurbineBuilder:
         hub = gm.addCylinder(
             x=0, y=0, z=0, dx=0, dy=0, dz=self.hub_height, r=self.hub_radius
         )
-        # draw blades, these start with a center at 0, 0, 0, the thin edge aligned to x, height to z and the less thin edge to y
+        # draw blades, these start with a center at 0, 0, 0,
+        # the thin edge aligned to x, height to z and the less thin edge to y
         blades = [
             gm.addBox(
                 x=-self.blade_depth / 2,
@@ -159,6 +162,9 @@ class RushtonTurbineBuilder:
             gm.translate([(VOLUME, hub)], dx=hub_offset, dy=0, dz=0)
             gm.translate([(VOLUME, connector)], dx=connector_offset, dy=0, dz=0)
             gm.translate([(VOLUME, shaft)], dx=shaft_offset, dy=0, dz=0)
+            gm.translate([(VOLUME, hub)], dx=hub_offset, dy=0, dz=0)
+            gm.translate([(VOLUME, connector)], dx=connector_offset, dy=0, dz=0)
+            gm.translate([(VOLUME, shaft)], dx=shaft_offset, dy=0, dz=0)
             for blade in blades:
                 gm.translate([(VOLUME, blade)], dx=self.offset, dy=0, dz=0)
         elif self.axis_alignment == 1:
@@ -184,7 +190,11 @@ class RushtonTurbineBuilder:
             gm.translate([(VOLUME, hub)], dx=0, dy=0, dz=hub_offset)
             gm.translate([(VOLUME, connector)], dx=0, dy=0, dz=connector_offset)
             gm.translate([(VOLUME, shaft)], dx=0, dy=0, dz=shaft_offset)
+            gm.translate([(VOLUME, hub)], dx=0, dy=0, dz=hub_offset)
+            gm.translate([(VOLUME, connector)], dx=0, dy=0, dz=connector_offset)
+            gm.translate([(VOLUME, shaft)], dx=0, dy=0, dz=shaft_offset)
             for blade in blades:
+                gm.translate([(VOLUME, blade)], dx=0, dy=0, dz=self.offset)
                 gm.translate([(VOLUME, blade)], dx=0, dy=0, dz=self.offset)
 
         else:
@@ -232,6 +242,6 @@ class RushtonTurbineBuilder:
             gmsh.fltk.run()
 
 
-turbine = RushtonTurbineBuilder(axis_alignment=1, filepath="mesh/rushton")
+turbine = RushtonTurbineBuilder(axis_alignment=1)
 turbine.draw()
 turbine.export()
