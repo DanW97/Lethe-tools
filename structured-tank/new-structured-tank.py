@@ -337,6 +337,42 @@ class StructuredStirredTank:
             )
         )
 
+        # copy all points up to +z face and repeat the process
+        upper_baffle_pts = []
+        upper_outer_split_circle_pts = []
+        upper_inner_split_circle_pts = []
+        upper_centre_square_pts = []
+        upper_inside_baffle_pts = []
+        upper_outside_baffle_pts = []
+        upper_outer_square_pts = []
+        for baffle in baffle_pts:
+            upper_baffle = []
+            for pt in baffle:
+                new_pt = gm.copy([(POINT, pt)])
+                gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+                upper_baffle.append(new_pt[0][1])
+                upper_baffle_pts.append(upper_baffle)
+
+        for i in range(4):
+            new_pt = gm.copy([(POINT, outer_split_circle_pts[i])])
+            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+            upper_outer_split_circle_pts.append(new_pt)
+            new_pt = gm.copy([(POINT, inner_split_circle_pts[i])])
+            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+            upper_inner_split_circle_pts.append(new_pt)
+            new_pt = gm.copy([(POINT, centre_square_pts[i])])
+            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+            upper_centre_square_pts.append(new_pt)
+            new_pt = gm.copy([(POINT, inside_baffle_pts[i])])
+            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+            upper_inside_baffle_pts.append(new_pt)
+            new_pt = gm.copy([(POINT, outside_baffle_pts[i])])
+            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+            upper_outside_baffle_pts.append(new_pt)
+            new_pt = gm.copy([(POINT, outer_square_pts[i])])
+            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
+            upper_outer_square_pts.append(new_pt)
+
         gm.synchronize()
         msh = gm.mesh
         # transfinite definitions
