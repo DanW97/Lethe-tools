@@ -18,6 +18,11 @@ VOLUME = 3
 
 
 class StructuredStirredTank:
+    """
+    Class responsible for generating a structured stirred tank mesh from given
+    dimensions.
+    """
+
     def __init__(
         self,
         radius: float = 0.1,
@@ -30,6 +35,36 @@ class StructuredStirredTank:
         height_spacing: float = 0.005,
         radial_spacing: float = 0.005,
     ):
+        """
+        Create a stirred tank with 4 solid baffles based on user defined dimensions.
+
+        *ALL DIMENSIONS ARE ASSUMED TO BE IN METRES*
+
+        Parameters
+        ----------
+        radius : float, optional
+            Tank inner radius, by default 0.1
+        height : float, optional
+            *Fill* height (unless you are doing free surface simulations,
+            in which case then this can be the tank height), by default 0.1
+        axis_alignment : int, optional
+            Axis that the tank is aligned to, numbered from 0-2 for x-z respectively,
+            by default 2
+        baffle_width : float, optional
+            Baffle thickness, by default 0.005
+        baffle_depth : float, optional
+            Extension of baffle towards tank centre,
+            by default 0.02
+        filepath : str, optional
+            Path to save output files to, by default "stirred_tank"
+        view : bool, optional
+            Boolean to check if mesh is visualised after creation,
+            by default True
+        height_spacing : float, optional
+            Vertical cell spacing, by default 0.005
+        radial_spacing : float, optional
+            Horizontal cell spacing, by default 0.005
+        """
         self.filepath = filepath
         self.radius = radius
         self.height = height
@@ -45,13 +80,31 @@ class StructuredStirredTank:
         self.height_npts = (
             int(height / height_spacing) if int(height / height_spacing) > 0 else 1
         )
-        self.baffle_front_spacing = int(baffle_width / radial_spacing) if int(baffle_width / radial_spacing) > 0 else 1
+        self.baffle_front_spacing = (
+            int(baffle_width / radial_spacing)
+            if int(baffle_width / radial_spacing) > 0
+            else 1
+        )
         # (2*pi*r / 4 - baffle_width) / 2: arc length of each of the 8 segments
-        segment_length = 0.5*(0.5 * radius * np.pi - baffle_width)
-        self.arc_spacing = int(segment_length / radial_spacing) if int(segment_length / radial_spacing) > 0 else 1
-        self.baffle_edge_spacing = int(baffle_depth / radial_spacing) if int(baffle_depth / radial_spacing) > 0 else 1
-        connector_length = radius - baffle_depth - np.sum((self.baffle_origins[:, 1] / 2) ** 2)
-        self.straight_edge_spacing = int(connector_length / radial_spacing) if int(connector_length / radial_spacing) > 0 else 1
+        segment_length = 0.5 * (0.5 * radius * np.pi - baffle_width)
+        self.arc_spacing = (
+            int(segment_length / radial_spacing)
+            if int(segment_length / radial_spacing) > 0
+            else 1
+        )
+        self.baffle_edge_spacing = (
+            int(baffle_depth / radial_spacing)
+            if int(baffle_depth / radial_spacing) > 0
+            else 1
+        )
+        connector_length = (
+            radius - baffle_depth - np.sum((self.baffle_origins[:, 1] / 2) ** 2)
+        )
+        self.straight_edge_spacing = (
+            int(connector_length / radial_spacing)
+            if int(connector_length / radial_spacing) > 0
+            else 1
+        )
 
     def draw(self):
         gmsh.initialize(sys.argv)
@@ -337,6 +390,8 @@ class StructuredStirredTank:
             )
         )
 
+        gm.synchronize()
+
         # test hypothesis that the transfinite behaviour is mirrored on extrude
         # there are up to 4 unique values for nPoints for these curves:
         # 1. across baffle front, and centre square
@@ -344,103 +399,119 @@ class StructuredStirredTank:
         # 3. along lines connecting inner and outer circle arcs
         # 4. along lines connecting inner circle arcs and outer square, affecting
         #    the straight outer sections too
-        # inner straight sections, baffle edges and central square are spoken for 
+        # inner straight sections, baffle edges and central square are spoken for
         # already by the above constraints
         for i in range(4):
             # implement 1...
             #     for baffle front
             gm.mesh.setTransfiniteCurve(
-                baffle_extended_edges[i],
-                nPoints=self.baffle_front_spacing
+                baffle_extended_edges[i], nPoints=self.baffle_front_spacing
             )
             #     for straight section divider
             gm.mesh.setTransfiniteCurve(
-                middle_straight_edges[i],
-                nPoints=self.baffle_front_spacing
+                middle_straight_edges[i], nPoints=self.baffle_front_spacing
             )
             #     for central square
             gm.mesh.setTransfiniteCurve(
-                centre_square_edges[i],
-                nPoints=self.baffle_front_spacing
+                centre_square_edges[i], nPoints=self.baffle_front_spacing
             )
 
             # implement 2...
             #     for outer circle arcs
+            gm.mesh.setTransfiniteCurve(outer_curves[2 * i], nPoints=self.arc_spacing)
             gm.mesh.setTransfiniteCurve(
-                outer_curves[2*i],
-                nPoints=self.arc_spacing
-            )
-            gm.mesh.setTransfiniteCurve(
-                outer_curves[2*i+1],
-                nPoints=self.arc_spacing
+                outer_curves[2 * i + 1], nPoints=self.arc_spacing
             )
             #     for inner circle arcs
+            gm.mesh.setTransfiniteCurve(inner_curves[2 * i], nPoints=self.arc_spacing)
             gm.mesh.setTransfiniteCurve(
-                inner_curves[2*i],
-                nPoints=self.arc_spacing
-            )
-            gm.mesh.setTransfiniteCurve(
-                inner_curves[2*i+1],
-                nPoints=self.arc_spacing
+                inner_curves[2 * i + 1], nPoints=self.arc_spacing
             )
             #     for outer square edges
             gm.mesh.setTransfiniteCurve(
-                outer_square_vertical_edges[i],
-                nPoints=self.arc_spacing
+                outer_square_vertical_edges[i], nPoints=self.arc_spacing
             )
             gm.mesh.setTransfiniteCurve(
-                outer_square_horizontal_edges[i],
-                nPoints=self.arc_spacing
+                outer_square_horizontal_edges[i], nPoints=self.arc_spacing
             )
             #     for inner straight sections
             gm.mesh.setTransfiniteCurve(
-                inner_inside_straight_edges[i],
-                nPoints=self.arc_spacing
+                inner_inside_straight_edges[i], nPoints=self.arc_spacing
             )
             gm.mesh.setTransfiniteCurve(
-                inner_outside_straight_edges[i],
-                nPoints=self.arc_spacing
+                inner_outside_straight_edges[i], nPoints=self.arc_spacing
             )
 
             # implement 3...
             #     for circle arc connectors
             gm.mesh.setTransfiniteCurve(
-                outer_connecting_curves[i],
-                nPoints=self.baffle_edge_spacing
+                outer_connecting_curves[i], nPoints=self.baffle_edge_spacing
             )
             #     for baffle edges
             gm.mesh.setTransfiniteCurve(
-                baffle_inside_edges[i],
-                nPoints=self.baffle_edge_spacing
+                baffle_inside_edges[i], nPoints=self.baffle_edge_spacing
             )
             gm.mesh.setTransfiniteCurve(
-                baffle_outside_edges[i],
-                nPoints=self.baffle_edge_spacing
+                baffle_outside_edges[i], nPoints=self.baffle_edge_spacing
             )
             # implement 4...
-            #     for circle arc - square connectors    
+            #     for circle arc - square connectors
             gm.mesh.setTransfiniteCurve(
-                inner_connecting_curves[i],
-                nPoints=self.straight_edge_spacing
+                inner_connecting_curves[i], nPoints=self.straight_edge_spacing
             )
             #     for outer straight sections
             gm.mesh.setTransfiniteCurve(
-               outer_inside_straight_edges[i],
-                nPoints=self.straight_edge_spacing
+                outer_inside_straight_edges[i], nPoints=self.straight_edge_spacing
             )
             gm.mesh.setTransfiniteCurve(
-               outer_outside_straight_edges[i],
-                nPoints=self.straight_edge_spacing
+                outer_outside_straight_edges[i], nPoints=self.straight_edge_spacing
             )
+
+        # rotate if required
+        # gm.synchronize()
+        if self.axis_alignment == 0:
+            gm.rotate(
+                gmsh.model.getEntities(SURFACE),
+                x=0,
+                y=0,
+                z=0,
+                ax=0,
+                ay=1,
+                az=0,
+                angle=-np.pi / 2,
+            )
+            dx = self.height
+            dy = 0
+            dz = 0
+        elif self.axis_alignment == 1:
+            gm.rotate(
+                gmsh.model.getEntities(SURFACE),
+                x=0,
+                y=0,
+                z=0,
+                ax=1,
+                ay=0,
+                az=0,
+                angle=-np.pi / 2,
+            )
+            dx = 0
+            dy = self.height
+            dz = 0
+        elif self.axis_alignment == 2:
+            dx = 0
+            dy = 0
+            dz = self.height
+        else:
+            raise ValueError("Valid axis_alignment values are 0, 1 or 2 only!")
 
         # now extrude them
 
         outer_curved_extrude = [
             gm.extrude(
                 [(SURFACE, surface)],
-                dx=0,
-                dy=0,
-                dz=self.height,
+                dx=dx,
+                dy=dy,
+                dz=dz,
                 numElements=[self.height_npts],
                 recombine=True,
             )
@@ -449,9 +520,9 @@ class StructuredStirredTank:
         inner_curved_extrude = [
             gm.extrude(
                 [(SURFACE, surface)],
-                dx=0,
-                dy=0,
-                dz=self.height,
+                dx=dx,
+                dy=dy,
+                dz=dz,
                 numElements=[self.height_npts],
                 recombine=True,
             )
@@ -460,9 +531,9 @@ class StructuredStirredTank:
         outer_straight_extrude = [
             gm.extrude(
                 [(SURFACE, surface)],
-                dx=0,
-                dy=0,
-                dz=self.height,
+                dx=dx,
+                dy=dy,
+                dz=dz,
                 numElements=[self.height_npts],
                 recombine=True,
             )
@@ -471,9 +542,9 @@ class StructuredStirredTank:
         inner_straight_extrude = [
             gm.extrude(
                 [(SURFACE, surface)],
-                dx=0,
-                dy=0,
-                dz=self.height,
+                dx=dx,
+                dy=dy,
+                dz=dz,
                 numElements=[self.height_npts],
                 recombine=True,
             )
@@ -482,9 +553,9 @@ class StructuredStirredTank:
         square_extrude = [
             gm.extrude(
                 [(SURFACE, surface)],
-                dx=0,
-                dy=0,
-                dz=self.height,
+                dx=dx,
+                dy=dy,
+                dz=dz,
                 numElements=[self.height_npts],
                 recombine=True,
             )
@@ -492,20 +563,20 @@ class StructuredStirredTank:
         ]
         inner_square_extrude = gm.extrude(
             [(SURFACE, surface) for surface in inner_square_surfaces],
-            dx=0,
-            dy=0,
-            dz=self.height,
+            dx=dx,
+            dy=dy,
+            dz=dz,
             numElements=[self.height_npts],
             recombine=True,
         )
 
         gm.synchronize()
 
-        # transfinite surface definitions    
+        # transfinite surface definitions
         for _, surface in gmsh.model.getEntities(SURFACE):
             msh.setTransfiniteSurface(surface)
             msh.setRecombine(SURFACE, surface)
-        
+
         # we got 2 physical surfaces - noslip on tank surfaces, and weakly imposed
         # noslip at top of tank. To find the surfaces from the extrudes, they are
         # in the same order as the curve loops are defined, given that the curves
@@ -568,6 +639,16 @@ class StructuredStirredTank:
             gmsh.fltk.run()
 
 
-tank = StructuredStirredTank()
+diameter = 17.4 / 100
+
+# assume baffle width is same as rushton blade width,
+# therefore width = Tl/Wl * Wl/Dl * Dl/Dt
+tank = StructuredStirredTank(
+    radius=diameter / 2,
+    height=diameter,
+    baffle_depth=diameter / 10,
+    baffle_width=diameter * 0.333 * 0.2 * 0.1,
+    axis_alignment=0,
+)
 tank.draw()
 tank.export()
