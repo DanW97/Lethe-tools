@@ -78,22 +78,22 @@ class StructuredStirredTank:
         self.baffle_depth = baffle_depth
         self.view = view
         self.height_npts = (
-            int(height / height_spacing) if int(height / height_spacing) > 0 else 1
+            int(height / height_spacing) + 1 if int(height / height_spacing) > 0 else 1
         )
         self.baffle_front_spacing = (
-            int(baffle_width / radial_spacing)
+            int(baffle_width / radial_spacing) + 1
             if int(baffle_width / radial_spacing) > 0
             else 1
         )
         # (2*pi*r / 4 - baffle_width) / 2: arc length of each of the 8 segments
         segment_length = 0.5 * (0.5 * radius * np.pi - baffle_width)
         self.arc_spacing = (
-            int(segment_length / radial_spacing)
+            int(segment_length / radial_spacing) + 1
             if int(segment_length / radial_spacing) > 0
             else 1
         )
         self.baffle_edge_spacing = (
-            int(baffle_depth / radial_spacing)
+            int(baffle_depth / radial_spacing) + 1
             if int(baffle_depth / radial_spacing) > 0
             else 1
         )
@@ -648,7 +648,6 @@ tank = StructuredStirredTank(
     height=diameter,
     baffle_depth=diameter / 10,
     baffle_width=diameter * 0.333 * 0.2 * 0.1,
-    axis_alignment=0,
 )
 tank.draw()
 tank.export()
