@@ -27,9 +27,7 @@ class StructuredStirredTank:
         baffle_depth: float = 0.02,
         filepath: str = "stirred_tank",
         view: bool = True,
-        height_spacing: float = 0.001,
-        radial_coef: float = 1.0,
-        height_coef: float = 1.0,
+        height_spacing: float = 0.005,
         radial_spacing: float = 0.005,
     ):
         self.filepath = filepath
@@ -38,21 +36,30 @@ class StructuredStirredTank:
         self.axis_alignment = axis_alignment
         self.baffle_angles = np.linspace(0, 2 * np.pi, 8, endpoint=False)
         self.baffle_origins = np.zeros((3, 8))
+        self.baffle_origins[0, :] += self.radius * np.cos(self.baffle_angles)
+        self.baffle_origins[1, :] += self.radius * np.sin(self.baffle_angles)
         self.baffle_coordinates = np.zeros((3, 4, 4))
         self.baffle_width = baffle_width
         self.baffle_depth = baffle_depth
         self.view = view
+        self.height_npts = (
+            int(height / height_spacing) if int(height / height_spacing) > 0 else 1
+        )
+        self.baffle_front_spacing = int(baffle_width / radial_spacing) if int(baffle_width / radial_spacing) > 0 else 1
+        # (2*pi*r / 4 - baffle_width) / 2: arc length of each of the 8 segments
+        segment_length = 0.5*(0.5 * radius * np.pi - baffle_width)
+        self.arc_spacing = int(segment_length / radial_spacing) if int(segment_length / radial_spacing) > 0 else 1
+        self.baffle_edge_spacing = int(baffle_depth / radial_spacing) if int(baffle_depth / radial_spacing) > 0 else 1
+        connector_length = radius - baffle_depth - np.sum((self.baffle_origins[:, 1] / 2) ** 2)
+        self.straight_edge_spacing = int(connector_length / radial_spacing) if int(connector_length / radial_spacing) > 0 else 1
 
     def draw(self):
         gmsh.initialize(sys.argv)
         gmsh.model.add("Stirred Tank")
         gm = gmsh.model.geo
-        # define all the control points in the centre
+        msh = gm.mesh
         centre = gm.addPoint(0, 0, 0)
-        # upper_centre = gm.addPoint(0, 0, self.height)
-        self.baffle_origins[0, :] += self.radius * np.cos(self.baffle_angles)
-        self.baffle_origins[1, :] += self.radius * np.sin(self.baffle_angles)
-        # now assign 5 pts corresponding to the 4 corners of the baffle and its midpoint
+        # now assign 4 pts corresponding to the 4 corners of the baffle
         # from 0 rad:
         # 1 ----------- 0
         #   |
@@ -258,22 +265,20 @@ class StructuredStirredTank:
         for i in range(4):
             outer_loop = gm.addCurveLoop(
                 [
-                    baffle_outside_edges[i],
+                    -baffle_outside_edges[i],
                     inner_curves[2 * i],
-                    outer_connecting_curves[i],
-                    outer_curves[2 * i],
+                    -outer_connecting_curves[i],
+                    -outer_curves[2 * i],
                 ],
-                reorient=True,
             )
             outer_curved_surfaces.append(gm.addPlaneSurface([outer_loop]))
             outer_loop = gm.addCurveLoop(
                 [
                     outer_connecting_curves[i],
                     inner_curves[2 * i + 1],
-                    baffle_inside_edges[(i + 1) % 4],
-                    outer_curves[2 * i + 1],
+                    -baffle_inside_edges[(i + 1) % 4],
+                    -outer_curves[2 * i + 1],
                 ],
-                reorient=True,
             )
             outer_curved_surfaces.append(gm.addPlaneSurface([outer_loop]))
 
@@ -281,107 +286,272 @@ class StructuredStirredTank:
                 [
                     outer_outside_straight_edges[i],
                     outer_square_vertical_edges[i],
-                    inner_connecting_curves[i],
-                    inner_curves[2 * i],
+                    -inner_connecting_curves[i],
+                    -inner_curves[2 * i],
                 ],
-                reorient=True,
             )
             inner_curved_surfaces.append(gm.addPlaneSurface([inner_loop]))
             inner_loop = gm.addCurveLoop(
                 [
                     inner_connecting_curves[i],
-                    outer_square_horizontal_edges[(i + 1) % 4],
-                    outer_inside_straight_edges[(i + 1) % 4],
-                    inner_curves[2 * i + 1],
+                    -outer_square_horizontal_edges[(i + 1) % 4],
+                    -outer_inside_straight_edges[(i + 1) % 4],
+                    -inner_curves[2 * i + 1],
                 ],
-                reorient=True,
             )
             inner_curved_surfaces.append(gm.addPlaneSurface([inner_loop]))
 
             outer_loop = gm.addCurveLoop(
                 [
-                    baffle_extended_edges[i],
+                    -baffle_extended_edges[i],
                     outer_inside_straight_edges[i],
                     middle_straight_edges[i],
-                    outer_outside_straight_edges[i],
+                    -outer_outside_straight_edges[i],
                 ],
-                reorient=True,
             )
             outer_straight_surfaces.append(gm.addPlaneSurface([outer_loop]))
 
             inner_loop = gm.addCurveLoop(
                 [
-                    middle_straight_edges[i],
-                    inner_inside_straight_edges[i],
+                    -middle_straight_edges[i],
+                    -inner_inside_straight_edges[i],
                     centre_square_edges[(i - 1) % 4],
                     inner_outside_straight_edges[i],
                 ],
-                reorient=True,
             )
             inner_straight_surfaces.append(gm.addPlaneSurface([inner_loop]))
 
             square_loop = gm.addCurveLoop(
                 [
-                    inner_outside_straight_edges[i],
+                    -inner_outside_straight_edges[i],
                     inner_inside_straight_edges[(i + 1) % 4],
                     outer_square_horizontal_edges[(i + 1) % 4],
-                    outer_square_vertical_edges[i],
+                    -outer_square_vertical_edges[i],
                 ],
-                reorient=True,
             )
             square_surfaces.append(gm.addPlaneSurface([square_loop]))
 
         inner_square_surfaces.append(
             gm.addPlaneSurface(
-                [gm.addCurveLoop([line for line in centre_square_edges], reorient=True)]
+                [gm.addCurveLoop([line for line in centre_square_edges])]
             )
         )
 
-        # copy all points up to +z face and repeat the process
-        upper_baffle_pts = []
-        upper_outer_split_circle_pts = []
-        upper_inner_split_circle_pts = []
-        upper_centre_square_pts = []
-        upper_inside_baffle_pts = []
-        upper_outside_baffle_pts = []
-        upper_outer_square_pts = []
-        for baffle in baffle_pts:
-            upper_baffle = []
-            for pt in baffle:
-                new_pt = gm.copy([(POINT, pt)])
-                gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-                upper_baffle.append(new_pt[0][1])
-                upper_baffle_pts.append(upper_baffle)
-
+        # test hypothesis that the transfinite behaviour is mirrored on extrude
+        # there are up to 4 unique values for nPoints for these curves:
+        # 1. across baffle front, and centre square
+        # 2. across circle arcs and outer squares
+        # 3. along lines connecting inner and outer circle arcs
+        # 4. along lines connecting inner circle arcs and outer square, affecting
+        #    the straight outer sections too
+        # inner straight sections, baffle edges and central square are spoken for 
+        # already by the above constraints
         for i in range(4):
-            new_pt = gm.copy([(POINT, outer_split_circle_pts[i])])
-            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-            upper_outer_split_circle_pts.append(new_pt)
-            new_pt = gm.copy([(POINT, inner_split_circle_pts[i])])
-            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-            upper_inner_split_circle_pts.append(new_pt)
-            new_pt = gm.copy([(POINT, centre_square_pts[i])])
-            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-            upper_centre_square_pts.append(new_pt)
-            new_pt = gm.copy([(POINT, inside_baffle_pts[i])])
-            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-            upper_inside_baffle_pts.append(new_pt)
-            new_pt = gm.copy([(POINT, outside_baffle_pts[i])])
-            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-            upper_outside_baffle_pts.append(new_pt)
-            new_pt = gm.copy([(POINT, outer_square_pts[i])])
-            gm.translate(new_pt, dx=0, dy=0, dz=self.height)
-            upper_outer_square_pts.append(new_pt)
+            # implement 1...
+            #     for baffle front
+            gm.mesh.setTransfiniteCurve(
+                baffle_extended_edges[i],
+                nPoints=self.baffle_front_spacing
+            )
+            #     for straight section divider
+            gm.mesh.setTransfiniteCurve(
+                middle_straight_edges[i],
+                nPoints=self.baffle_front_spacing
+            )
+            #     for central square
+            gm.mesh.setTransfiniteCurve(
+                centre_square_edges[i],
+                nPoints=self.baffle_front_spacing
+            )
+
+            # implement 2...
+            #     for outer circle arcs
+            gm.mesh.setTransfiniteCurve(
+                outer_curves[2*i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                outer_curves[2*i+1],
+                nPoints=self.arc_spacing
+            )
+            #     for inner circle arcs
+            gm.mesh.setTransfiniteCurve(
+                inner_curves[2*i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                inner_curves[2*i+1],
+                nPoints=self.arc_spacing
+            )
+            #     for outer square edges
+            gm.mesh.setTransfiniteCurve(
+                outer_square_vertical_edges[i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                outer_square_horizontal_edges[i],
+                nPoints=self.arc_spacing
+            )
+            #     for inner straight sections
+            gm.mesh.setTransfiniteCurve(
+                inner_inside_straight_edges[i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                inner_outside_straight_edges[i],
+                nPoints=self.arc_spacing
+            )
+
+            # implement 3...
+            #     for circle arc connectors
+            gm.mesh.setTransfiniteCurve(
+                outer_connecting_curves[i],
+                nPoints=self.baffle_edge_spacing
+            )
+            #     for baffle edges
+            gm.mesh.setTransfiniteCurve(
+                baffle_inside_edges[i],
+                nPoints=self.baffle_edge_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                baffle_outside_edges[i],
+                nPoints=self.baffle_edge_spacing
+            )
+            # implement 4...
+            #     for circle arc - square connectors    
+            gm.mesh.setTransfiniteCurve(
+                inner_connecting_curves[i],
+                nPoints=self.straight_edge_spacing
+            )
+            #     for outer straight sections
+            gm.mesh.setTransfiniteCurve(
+               outer_inside_straight_edges[i],
+                nPoints=self.straight_edge_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+               outer_outside_straight_edges[i],
+                nPoints=self.straight_edge_spacing
+            )
+
+        # now extrude them
+
+        outer_curved_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in outer_curved_surfaces
+        ]
+        inner_curved_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in inner_curved_surfaces
+        ]
+        outer_straight_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in outer_straight_surfaces
+        ]
+        inner_straight_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in inner_straight_surfaces
+        ]
+        square_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in square_surfaces
+        ]
+        inner_square_extrude = gm.extrude(
+            [(SURFACE, surface) for surface in inner_square_surfaces],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
 
         gm.synchronize()
-        msh = gm.mesh
-        # transfinite definitions
-        for _, line in gmsh.model.getEntities(CURVE):
-            msh.setTransfiniteCurve(line, nPoints=5)
 
+        # transfinite surface definitions    
         for _, surface in gmsh.model.getEntities(SURFACE):
             msh.setTransfiniteSurface(surface)
             msh.setRecombine(SURFACE, surface)
+        
+        # we got 2 physical surfaces - noslip on tank surfaces, and weakly imposed
+        # noslip at top of tank. To find the surfaces from the extrudes, they are
+        # in the same order as the curve loops are defined, given that the curves
+        # have been manually oriented.
+
+        # id 1, noslip, this is relevant for the outer_curved and outer_straight
+        # extrudes, as well as all the pre-extruded surfaces
+        tank_surfaces = [inner_square_surfaces[0]]
+        for i in range(4):
+            # bottom of tank
+            tank_surfaces.append(outer_curved_surfaces[2 * i])
+            tank_surfaces.append(outer_curved_surfaces[2 * i + 1])
+            tank_surfaces.append(inner_curved_surfaces[2 * i])
+            tank_surfaces.append(inner_curved_surfaces[2 * i + 1])
+            tank_surfaces.append(outer_straight_surfaces[i])
+            tank_surfaces.append(inner_straight_surfaces[i])
+            tank_surfaces.append(square_surfaces[i])
+            # lateral surfaces - curves: curves are last in the loops defining
+            # outer_curved_surfaces, so should be the last elements
+            tank_surfaces.append(outer_curved_extrude[2 * i][-1][1])
+            tank_surfaces.append(outer_curved_extrude[2 * i + 1][-1][1])
+            # lateral surfaces - baffle sides: outer_curved_extrude 2*i has
+            # outside edge, and 2*i + 1 the inside edge
+            tank_surfaces.append(outer_curved_extrude[2 * i][2][1])
+            tank_surfaces.append(outer_curved_extrude[2 * i + 1][4][1])
+            # lateral surfaces - baffle front: outer_straight extrude has
+            # these at the 1st surface past the volume in the returned list
+            tank_surfaces.append(outer_straight_extrude[i][2][1])
+
+        gm.addPhysicalGroup(SURFACE, tank_surfaces)
+
+        # id 2, weakly imposed noslip, this is the first element of each extrude
+        top_surfaces = [inner_square_extrude[0][1]]
+        for i in range(4):
+            top_surfaces.append(outer_curved_extrude[2 * i][0][1])
+            top_surfaces.append(outer_curved_extrude[2 * i + 1][0][1])
+            top_surfaces.append(inner_curved_extrude[2 * i][0][1])
+            top_surfaces.append(inner_curved_extrude[2 * i + 1][0][1])
+            top_surfaces.append(outer_straight_extrude[i][0][1])
+            top_surfaces.append(inner_straight_extrude[i][0][1])
+            top_surfaces.append(square_extrude[i][0][1])
+
+        gm.addPhysicalGroup(SURFACE, top_surfaces)
+
+        # physical volume
+        gm.addPhysicalGroup(VOLUME, [tag for _, tag in gmsh.model.getEntities(VOLUME)])
 
     def export(self):
         gmsh.model.geo.synchronize()
