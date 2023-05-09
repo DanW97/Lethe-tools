@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*-coding:utf-8 -*-
-# File    :   structured-tank.py
-# Time    :   03/03/2023
+# File    :   new-structured-tank.py
+# Time    :   05/05/2023
 # Author  :   Daniel Weston
 # Version :   0.1.0
 # Contact :   dtw545@student.bham.ac.uk
@@ -27,106 +27,87 @@ class StructuredStirredTank:
         baffle_depth: float = 0.02,
         filepath: str = "stirred_tank",
         view: bool = True,
-        height_spacing: float = 0.001,
-        radial_coef: float = 1.0,
-        height_coef: float = 1.0,
+        height_spacing: float = 0.005,
         radial_spacing: float = 0.005,
     ):
         self.filepath = filepath
         self.radius = radius
         self.height = height
         self.axis_alignment = axis_alignment
-        self.baffle_angles = np.linspace(0, 2 * np.pi, 4, endpoint=False)
-        self.baffle_origins = np.zeros((3, 4))
+        self.baffle_angles = np.linspace(0, 2 * np.pi, 8, endpoint=False)
+        self.baffle_origins = np.zeros((3, 8))
+        self.baffle_origins[0, :] += self.radius * np.cos(self.baffle_angles)
+        self.baffle_origins[1, :] += self.radius * np.sin(self.baffle_angles)
         self.baffle_coordinates = np.zeros((3, 4, 4))
         self.baffle_width = baffle_width
         self.baffle_depth = baffle_depth
         self.view = view
-        self.radial_coef = radial_coef
-        self.height_coef = height_coef
-        # set number of points based on spacing, all values must end up >= 1 otherwise Bad Things(tm) occur
-        self.outer_curve_npts = (
-            int((0.5 * np.pi * radius - baffle_width) / radial_spacing)
-            if int((0.5 * np.pi * radius - baffle_width) / radial_spacing) > 0
-            else 1
-        )
-        self.baffle_npts = (
-            int(baffle_depth / radial_spacing)
-            if int(baffle_depth / radial_spacing) > 0
-            else 1
-        )
-        half_angle = np.pi * 135 / (2 * 180)
-        self.baffle_to_octagon_npts = (
-            int(
-                (
-                    self.radius
-                    - self.baffle_depth
-                    - np.tan(half_angle) * self.baffle_width / 2
-                )
-                / radial_spacing
-            )
-            if int(
-                (
-                    self.radius
-                    - self.baffle_depth
-                    - np.tan(half_angle) * self.baffle_width / 2
-                )
-                / radial_spacing
-            )
-            > 0
-            else 1
-        )
-        self.baffle_extended_edge_npts = (
-            int(baffle_width / radial_spacing)
-            if int(baffle_width / radial_spacing) > 0
-            else 1
-        )
-        self.vertical_npts = (
+        self.height_npts = (
             int(height / height_spacing) if int(height / height_spacing) > 0 else 1
         )
-        self.octagon_segment_npts = (
-            int(np.tan(half_angle) * self.baffle_width / 2)
-            if int(np.tan(half_angle) * self.baffle_width / 2) > 0
-            else 1
-        )
+        self.baffle_front_spacing = int(baffle_width / radial_spacing) if int(baffle_width / radial_spacing) > 0 else 1
+        # (2*pi*r / 4 - baffle_width) / 2: arc length of each of the 8 segments
+        segment_length = 0.5*(0.5 * radius * np.pi - baffle_width)
+        self.arc_spacing = int(segment_length / radial_spacing) if int(segment_length / radial_spacing) > 0 else 1
+        self.baffle_edge_spacing = int(baffle_depth / radial_spacing) if int(baffle_depth / radial_spacing) > 0 else 1
+        connector_length = radius - baffle_depth - np.sum((self.baffle_origins[:, 1] / 2) ** 2)
+        self.straight_edge_spacing = int(connector_length / radial_spacing) if int(connector_length / radial_spacing) > 0 else 1
 
     def draw(self):
         gmsh.initialize(sys.argv)
         gmsh.model.add("Stirred Tank")
         gm = gmsh.model.geo
-        # define all the control points in the centre
+        msh = gm.mesh
         centre = gm.addPoint(0, 0, 0)
-        upper_centre = gm.addPoint(0, 0, self.height)
-        self.baffle_origins[0, :] += self.radius * np.cos(self.baffle_angles)
-        self.baffle_origins[1, :] += self.radius * np.sin(self.baffle_angles)
         # now assign 4 pts corresponding to the 4 corners of the baffle
         # from 0 rad:
         # 1 ----------- 0
         #   |
         #   |
+        #   |
         # 2 ----------- 3
         baffle_pts = []
+        outer_split_circle_pts = []
+        inner_split_circle_pts = []
+        centre_square_pts = []
+        inside_baffle_pts = []
+        outside_baffle_pts = []
+        outer_square_pts = []
         for i in range(4):
             baffle = []
-            unit_vec = self.baffle_origins[:, i] / np.sqrt(
-                sum(self.baffle_origins[:, i] ** 2)
+            unit_vec = self.baffle_origins[:, 2 * i] / np.sqrt(
+                sum(self.baffle_origins[:, 2 * i] ** 2)
+            )
+            other_unit_vec = self.baffle_origins[:, 2 * i + 1] / np.sqrt(
+                sum(self.baffle_origins[:, 2 * i + 1] ** 2)
             )
             normal_unit_vec = np.array([-unit_vec[1], unit_vec[0]])  # only need xy part
             self.baffle_coordinates[0:2, i, 0] = (
-                self.baffle_origins[0:2, i] + 0.5 * self.baffle_width * normal_unit_vec
+                self.baffle_origins[0:2, 2 * i]
+                + 0.5 * self.baffle_width * normal_unit_vec
             )
             self.baffle_coordinates[0:2, i, 1] = (
-                self.baffle_origins[0:2, i]
+                self.baffle_origins[0:2, 2 * i]
                 + 0.5 * self.baffle_width * normal_unit_vec
                 - unit_vec[0:2] * self.baffle_depth
             )
             self.baffle_coordinates[0:2, i, 2] = (
-                self.baffle_origins[0:2, i]
+                self.baffle_origins[0:2, 2 * i]
                 - 0.5 * self.baffle_width * normal_unit_vec
                 - unit_vec[0:2] * self.baffle_depth
             )
             self.baffle_coordinates[0:2, i, 3] = (
-                self.baffle_origins[0:2, i] - 0.5 * self.baffle_width * normal_unit_vec
+                self.baffle_origins[0:2, 2 * i]
+                - 0.5 * self.baffle_width * normal_unit_vec
+            )
+            outer_split_circle_pts.append(
+                gm.addPoint(*self.baffle_origins[:, 2 * i + 1])
+            )
+            self.baffle_origins[0:2, 2 * i + 1] -= (
+                other_unit_vec[0:2] * self.baffle_depth
+            )
+            inner_split_circle_pts.append(
+                gm.addPoint(*self.baffle_origins[:, 2 * i + 1])
             )
             # assign points
             for j in range(4):
@@ -138,266 +119,443 @@ class StructuredStirredTank:
                     )
                 )
             baffle_pts.append(baffle)
-
-        # draw central octagon
-        # the points are 1 and 2 from the baffles, located baffle_width * tan(67.5) / 2 from
-        # the centre - this ensures the octagon is regular
-        half_angle = np.pi * 135 / (2 * 180)
-        octagon_pts = []
-        for i in range(4):
-            octagon_pts.append(
+            self.baffle_coordinates[0:2, i, 1] = (
+                self.baffle_origins[0:2, 2 * i]
+                + 0.5 * self.baffle_width * normal_unit_vec
+                - unit_vec[0:2] * self.baffle_depth
+            )
+            centre_square_pts.append(
                 gm.addPoint(
-                    x=self.baffle_coordinates[0, i, 2]
-                    - (
-                        self.radius
-                        - self.baffle_depth
-                        - np.tan(half_angle) * self.baffle_width / 2
-                    )
-                    * np.cos(i * 0.5 * np.pi),
-                    y=self.baffle_coordinates[1, i, 2]
-                    - (
-                        self.radius
-                        - self.baffle_depth
-                        - np.tan(half_angle) * self.baffle_width / 2
-                    )
-                    * np.sin(i * 0.5 * np.pi),
-                    z=self.baffle_coordinates[2, i, 2],
+                    x=self.baffle_width
+                    * 0.5
+                    * np.sqrt(2)
+                    * np.cos(self.baffle_angles[2 * i + 1]),
+                    y=self.baffle_width
+                    * 0.5
+                    * np.sqrt(2)
+                    * np.sin(self.baffle_angles[2 * i + 1]),
+                    z=0,
                 )
             )
-            octagon_pts.append(
-                gm.addPoint(
-                    x=self.baffle_coordinates[0, i, 1]
-                    - (
-                        self.radius
-                        - self.baffle_depth
-                        - np.tan(half_angle) * self.baffle_width / 2
+            square_coords = self.baffle_origins[:, 2 * i + 1] / 2
+            outer_square_pts.append(gm.addPoint(*(square_coords)))
+            if np.tan(self.baffle_angles[2 * i + 1]) > 0:
+                outside_baffle_pts.append(
+                    gm.addPoint(
+                        x=square_coords[0],
+                        y=self.baffle_width
+                        * 0.5
+                        * np.sqrt(2)
+                        * np.sin(self.baffle_angles[2 * i + 1]),
+                        z=0,
                     )
-                    * np.cos(i * 0.5 * np.pi),
-                    y=self.baffle_coordinates[1, i, 1]
-                    - (
-                        self.radius
-                        - self.baffle_depth
-                        - np.tan(half_angle) * self.baffle_width / 2
-                    )
-                    * np.sin(i * 0.5 * np.pi),
-                    z=self.baffle_coordinates[2, i, 1],
                 )
-            )
+                inside_baffle_pts.append(
+                    gm.addPoint(
+                        x=square_coords[0],
+                        y=self.baffle_width
+                        * 0.5
+                        * np.sqrt(2)
+                        * np.sin(self.baffle_angles[(2 * i - 1) % 8]),
+                        z=0,
+                    )
+                )
+            else:
+                outside_baffle_pts.append(
+                    gm.addPoint(
+                        x=self.baffle_width
+                        * 0.5
+                        * np.sqrt(2)
+                        * np.cos(self.baffle_angles[2 * i + 1]),
+                        y=square_coords[1],
+                        z=0,
+                    )
+                )
+                inside_baffle_pts.append(
+                    gm.addPoint(
+                        x=self.baffle_width
+                        * 0.5
+                        * np.sqrt(2)
+                        * np.cos(self.baffle_angles[(2 * i - 1) % 8]),
+                        y=square_coords[1],
+                        z=0,
+                    )
+                )
 
         # curve drawing
-        # sides of octagon
-        # octagon_edges = []
-        # for i, _ in enumerate(octagon_pts):
-        #     octagon_edges.append(gm.addLine(octagon_pts[i], octagon_pts[(i + 1) % 8]))
-        # rest of surface
         outer_curves = []
         inner_curves = []
-        baffle_extended_edges = []
+        outer_connecting_curves = []
+        inner_connecting_curves = []
         baffle_inside_edges = []
         baffle_outside_edges = []
-        # baffle_to_octagon_inside = []
-        # baffle_to_octagon_outside = []
-        # octagon_segments = []
-        kite_lines = []
+        baffle_extended_edges = []
+        centre_square_edges = []
+        outer_inside_straight_edges = []
+        outer_outside_straight_edges = []
+        inner_inside_straight_edges = []
+        inner_outside_straight_edges = []
+        outer_square_vertical_edges = []
+        outer_square_horizontal_edges = []
+        middle_straight_edges = []
         for i in range(4):
             # draw outer curves
             outer_curves.append(
-                gm.addCircleArc(baffle_pts[i][0], centre, baffle_pts[(i + 1) % 4][3])
+                gm.addCircleArc(baffle_pts[i][0], centre, outer_split_circle_pts[i])
+            )
+            outer_curves.append(
+                gm.addCircleArc(
+                    outer_split_circle_pts[i], centre, baffle_pts[(i + 1) % 4][3]
+                )
             )
             # draw inner curves
             inner_curves.append(
-                gm.addCircleArc(baffle_pts[i][1], centre, baffle_pts[(i + 1) % 4][2])
+                gm.addCircleArc(baffle_pts[i][1], centre, inner_split_circle_pts[i])
             )
-            # draw extended baffle lines
-            baffle_extended_edges.append(gm.addLine(baffle_pts[i][2], baffle_pts[i][1]))
+            inner_curves.append(
+                gm.addCircleArc(
+                    inner_split_circle_pts[i], centre, baffle_pts[(i + 1) % 4][2]
+                )
+            )
+            # draw curves connecting outer and inner curve midpoints
+            outer_connecting_curves.append(
+                gm.addLine(outer_split_circle_pts[i], inner_split_circle_pts[i])
+            )
+            inner_connecting_curves.append(
+                gm.addLine(inner_split_circle_pts[i], outer_square_pts[i])
+            )
             # draw inside edge baffle lines
             baffle_inside_edges.append(gm.addLine(baffle_pts[i][3], baffle_pts[i][2]))
             # draw outside edge baffle lines
             baffle_outside_edges.append(gm.addLine(baffle_pts[i][1], baffle_pts[i][0]))
-            # # draw inside edge connecting lines to octagon
-            # baffle_to_octagon_inside.append(gm.addLine(baffle_pts[i][2], octagon_pts[2 * i]))
-            # # draw outside edge connecting lines to octagon
-            # baffle_to_octagon_outside.append(gm.addLine(baffle_pts[i][1], octagon_pts[2 * i + 1]))
-            # # draw octagon segments
-            # octagon_segments.append(gm.addLine(octagon_pts[2 * i], centre))
-            kite_lines.append(gm.addLine(baffle_pts[i][2], centre))
+            # draw extended baffle edge
+            baffle_extended_edges.append(gm.addLine(baffle_pts[i][2], baffle_pts[i][1]))
+            centre_square_edges.append(
+                gm.addLine(centre_square_pts[i], centre_square_pts[(i + 1) % 4])
+            )
+            outer_inside_straight_edges.append(
+                gm.addLine(baffle_pts[i][2], inside_baffle_pts[i])
+            )
+            outer_outside_straight_edges.append(
+                gm.addLine(baffle_pts[i][1], outside_baffle_pts[i])
+            )
+            inner_inside_straight_edges.append(
+                gm.addLine(centre_square_pts[(i - 1) % 4], inside_baffle_pts[i])
+            )
+            inner_outside_straight_edges.append(
+                gm.addLine(centre_square_pts[i], outside_baffle_pts[i])
+            )
+            outer_square_vertical_edges.append(
+                gm.addLine(outside_baffle_pts[i], outer_square_pts[i])
+            )
+            outer_square_horizontal_edges.append(
+                gm.addLine(inside_baffle_pts[i], outer_square_pts[(i - 1) % 4])
+            )
+            middle_straight_edges.append(
+                gm.addLine(inside_baffle_pts[i], outside_baffle_pts[i])
+            )
 
         # surfaces
-        outer_surfaces = []
-        inner_surfaces = []
-        straight_surfaces = []
-        octagon_surfaces = []
-        kite_surfaces = []
+        outer_curved_surfaces = []
+        inner_curved_surfaces = []
+        outer_straight_surfaces = []
+        inner_straight_surfaces = []
+        square_surfaces = []
+        inner_square_surfaces = []
         for i in range(4):
-            # curved surfaces between baffles
             outer_loop = gm.addCurveLoop(
                 [
-                    baffle_outside_edges[i],
-                    outer_curves[i],
-                    baffle_inside_edges[(i + 1) % 4],
-                    inner_curves[i],
+                    -baffle_outside_edges[i],
+                    inner_curves[2 * i],
+                    -outer_connecting_curves[i],
+                    -outer_curves[2 * i],
                 ],
-                reorient=True,
             )
-            outer_surfaces.append(gm.addPlaneSurface([outer_loop]))
-            # inner surface
-            # inner_loop = gm.addCurveLoop([octagon_edges[2 * i + 1], baffle_to_octagon_inside[(i + 1) % 4], inner_curves[i], baffle_to_octagon_outside[i]], reorient = True)
-            # inner_surfaces.append(gm.addPlaneSurface([inner_loop]))
-            # straight surfaces from baffle to octagon
-            # straight_loop = gm.addCurveLoop([baffle_to_octagon_inside[i], octagon_edges[2 * i], baffle_to_octagon_outside[i], baffle_extended_edges[i]], reorient= True)
-            # straight_surfaces.append(gm.addPlaneSurface([straight_loop]))
-            # inner octagon surfaces
-            # octagon_loop = gm.addCurveLoop([octagon_edges[2 * i], octagon_segments[i], octagon_segments[(i + 1)%4], octagon_edges[2 * i + 1]], reorient= True)
-            # octagon_surfaces.append(gm.addPlaneSurface([octagon_loop]))
-            kite_loop = gm.addCurveLoop(
+            outer_curved_surfaces.append(gm.addPlaneSurface([outer_loop]))
+            outer_loop = gm.addCurveLoop(
                 [
-                    baffle_extended_edges[i],
-                    kite_lines[i],
-                    kite_lines[(i + 1) % 4],
-                    inner_curves[i],
+                    outer_connecting_curves[i],
+                    inner_curves[2 * i + 1],
+                    -baffle_inside_edges[(i + 1) % 4],
+                    -outer_curves[2 * i + 1],
                 ],
-                reorient=True,
             )
-            kite_surfaces.append(gm.addPlaneSurface([kite_loop]))
+            outer_curved_surfaces.append(gm.addPlaneSurface([outer_loop]))
+
+            inner_loop = gm.addCurveLoop(
+                [
+                    outer_outside_straight_edges[i],
+                    outer_square_vertical_edges[i],
+                    -inner_connecting_curves[i],
+                    -inner_curves[2 * i],
+                ],
+            )
+            inner_curved_surfaces.append(gm.addPlaneSurface([inner_loop]))
+            inner_loop = gm.addCurveLoop(
+                [
+                    inner_connecting_curves[i],
+                    -outer_square_horizontal_edges[(i + 1) % 4],
+                    -outer_inside_straight_edges[(i + 1) % 4],
+                    -inner_curves[2 * i + 1],
+                ],
+            )
+            inner_curved_surfaces.append(gm.addPlaneSurface([inner_loop]))
+
+            outer_loop = gm.addCurveLoop(
+                [
+                    -baffle_extended_edges[i],
+                    outer_inside_straight_edges[i],
+                    middle_straight_edges[i],
+                    -outer_outside_straight_edges[i],
+                ],
+            )
+            outer_straight_surfaces.append(gm.addPlaneSurface([outer_loop]))
+
+            inner_loop = gm.addCurveLoop(
+                [
+                    -middle_straight_edges[i],
+                    -inner_inside_straight_edges[i],
+                    centre_square_edges[(i - 1) % 4],
+                    inner_outside_straight_edges[i],
+                ],
+            )
+            inner_straight_surfaces.append(gm.addPlaneSurface([inner_loop]))
+
+            square_loop = gm.addCurveLoop(
+                [
+                    -inner_outside_straight_edges[i],
+                    inner_inside_straight_edges[(i + 1) % 4],
+                    outer_square_horizontal_edges[(i + 1) % 4],
+                    -outer_square_vertical_edges[i],
+                ],
+            )
+            square_surfaces.append(gm.addPlaneSurface([square_loop]))
+
+        inner_square_surfaces.append(
+            gm.addPlaneSurface(
+                [gm.addCurveLoop([line for line in centre_square_edges])]
+            )
+        )
+
+        # test hypothesis that the transfinite behaviour is mirrored on extrude
+        # there are up to 4 unique values for nPoints for these curves:
+        # 1. across baffle front, and centre square
+        # 2. across circle arcs and outer squares
+        # 3. along lines connecting inner and outer circle arcs
+        # 4. along lines connecting inner circle arcs and outer square, affecting
+        #    the straight outer sections too
+        # inner straight sections, baffle edges and central square are spoken for 
+        # already by the above constraints
+        for i in range(4):
+            # implement 1...
+            #     for baffle front
+            gm.mesh.setTransfiniteCurve(
+                baffle_extended_edges[i],
+                nPoints=self.baffle_front_spacing
+            )
+            #     for straight section divider
+            gm.mesh.setTransfiniteCurve(
+                middle_straight_edges[i],
+                nPoints=self.baffle_front_spacing
+            )
+            #     for central square
+            gm.mesh.setTransfiniteCurve(
+                centre_square_edges[i],
+                nPoints=self.baffle_front_spacing
+            )
+
+            # implement 2...
+            #     for outer circle arcs
+            gm.mesh.setTransfiniteCurve(
+                outer_curves[2*i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                outer_curves[2*i+1],
+                nPoints=self.arc_spacing
+            )
+            #     for inner circle arcs
+            gm.mesh.setTransfiniteCurve(
+                inner_curves[2*i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                inner_curves[2*i+1],
+                nPoints=self.arc_spacing
+            )
+            #     for outer square edges
+            gm.mesh.setTransfiniteCurve(
+                outer_square_vertical_edges[i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                outer_square_horizontal_edges[i],
+                nPoints=self.arc_spacing
+            )
+            #     for inner straight sections
+            gm.mesh.setTransfiniteCurve(
+                inner_inside_straight_edges[i],
+                nPoints=self.arc_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                inner_outside_straight_edges[i],
+                nPoints=self.arc_spacing
+            )
+
+            # implement 3...
+            #     for circle arc connectors
+            gm.mesh.setTransfiniteCurve(
+                outer_connecting_curves[i],
+                nPoints=self.baffle_edge_spacing
+            )
+            #     for baffle edges
+            gm.mesh.setTransfiniteCurve(
+                baffle_inside_edges[i],
+                nPoints=self.baffle_edge_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+                baffle_outside_edges[i],
+                nPoints=self.baffle_edge_spacing
+            )
+            # implement 4...
+            #     for circle arc - square connectors    
+            gm.mesh.setTransfiniteCurve(
+                inner_connecting_curves[i],
+                nPoints=self.straight_edge_spacing
+            )
+            #     for outer straight sections
+            gm.mesh.setTransfiniteCurve(
+               outer_inside_straight_edges[i],
+                nPoints=self.straight_edge_spacing
+            )
+            gm.mesh.setTransfiniteCurve(
+               outer_outside_straight_edges[i],
+                nPoints=self.straight_edge_spacing
+            )
+
+        # now extrude them
+
+        outer_curved_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in outer_curved_surfaces
+        ]
+        inner_curved_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in inner_curved_surfaces
+        ]
+        outer_straight_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in outer_straight_surfaces
+        ]
+        inner_straight_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in inner_straight_surfaces
+        ]
+        square_extrude = [
+            gm.extrude(
+                [(SURFACE, surface)],
+                dx=0,
+                dy=0,
+                dz=self.height,
+                numElements=[self.height_npts],
+                recombine=True,
+            )
+            for surface in square_surfaces
+        ]
+        inner_square_extrude = gm.extrude(
+            [(SURFACE, surface) for surface in inner_square_surfaces],
+            dx=0,
+            dy=0,
+            dz=self.height,
+            numElements=[self.height_npts],
+            recombine=True,
+        )
 
         gm.synchronize()
 
-        # # copy and move points to +z direction
-        # upper_baffle_pts = []
-        # for baffle in baffle_pts:
-        #     upper_baffle = []
-        #     for pt in baffle:
-        #         new_pt = gm.copy([(POINT, pt)])
-        #         gm.translate(new_pt, dx = 0, dy = 0, dz = self.height)
-        #         upper_baffle.append(new_pt[0][1])
-        #     upper_baffle_pts.append(upper_baffle)
-        # upper_octagon_pts = []
-        # for pt in octagon_pts:
-        #     new_pt = gm.copy([(POINT, pt)])
-        #     gm.translate(new_pt, dx = 0, dy = 0, dz = self.height)
-        #     upper_octagon_pts.append(new_pt[0][1])
-        # # draw curves
-        # # sides of octagon
-        # upper_octagon_edges = []
-        # for i, _ in enumerate(octagon_pts):
-        #     upper_octagon_edges.append(gm.addLine(upper_octagon_pts[i], upper_octagon_pts[(i + 1) % 8]))
-        # # rest of surface
-        # upper_outer_curves = []
-        # upper_inner_curves = []
-        # upper_baffle_extended_edges = []
-        # upper_baffle_inside_edges = []
-        # upper_baffle_outside_edges = []
-        # upper_baffle_to_octagon_inside = []
-        # upper_baffle_to_octagon_outside = []
-        # upper_octagon_segments = []
-        # for i in range(4):
-        #     # draw outer curves
-        #     upper_outer_curves.append(gm.addCircleArc(upper_baffle_pts[i][0], upper_centre, upper_baffle_pts[(i + 1) % 4][3]))
-        #     # draw inner curves
-        #     upper_inner_curves.append(gm.addCircleArc(upper_baffle_pts[i][1], upper_centre, upper_baffle_pts[(i + 1) % 4][2]))
-        #     # draw extended baffle lines
-        #     upper_baffle_extended_edges.append(gm.addLine(upper_baffle_pts[i][2], upper_baffle_pts[i][1]))
-        #     # draw inside edge baffle lines
-        #     upper_baffle_inside_edges.append(gm.addLine(upper_baffle_pts[i][3], upper_baffle_pts[i][2]))
-        #     # draw outside edge baffle lines
-        #     upper_baffle_outside_edges.append(gm.addLine(upper_baffle_pts[i][1], upper_baffle_pts[i][0]))
-        #     # draw inside edge connecting lines to octagon
-        #     upper_baffle_to_octagon_inside.append(gm.addLine(upper_baffle_pts[i][2], upper_octagon_pts[2 * i]))
-        #     # draw outside edge connecting lines to octagon
-        #     upper_baffle_to_octagon_outside.append(gm.addLine(upper_baffle_pts[i][1], upper_octagon_pts[2 * i + 1]))
-        #     # draw octagon segments
-        #     upper_octagon_segments.append(gm.addLine(upper_octagon_pts[2 * i], upper_centre))
+        # transfinite surface definitions    
+        for _, surface in gmsh.model.getEntities(SURFACE):
+            msh.setTransfiniteSurface(surface)
+            msh.setRecombine(SURFACE, surface)
+        
+        # we got 2 physical surfaces - noslip on tank surfaces, and weakly imposed
+        # noslip at top of tank. To find the surfaces from the extrudes, they are
+        # in the same order as the curve loops are defined, given that the curves
+        # have been manually oriented.
 
-        # # draw surfaces
-        # upper_outer_surfaces = []
-        # upper_inner_surfaces = []
-        # upper_straight_surfaces = []
-        # upper_octagon_surfaces = []
-        # for i in range(4):
-        #     # curved surfaces between baffles
-        #     outer_loop = gm.addCurveLoop([upper_baffle_outside_edges[i], upper_outer_curves[i], upper_baffle_inside_edges[(i + 1) % 4], upper_inner_curves[i]], reorient= True)
-        #     upper_outer_surfaces.append(gm.addPlaneSurface([outer_loop]))
-        #     # inner surface
-        #     inner_loop = gm.addCurveLoop([upper_octagon_edges[2 * i + 1], upper_baffle_to_octagon_inside[(i + 1) % 4], upper_inner_curves[i], upper_baffle_to_octagon_outside[i]], reorient = True)
-        #     upper_inner_surfaces.append(gm.addPlaneSurface([inner_loop]))
-        #     # straight surfaces from baffle to octagon
-        #     straight_loop = gm.addCurveLoop([upper_baffle_to_octagon_inside[i], upper_octagon_edges[2 * i], upper_baffle_to_octagon_outside[i], upper_baffle_extended_edges[i]], reorient= True)
-        #     upper_straight_surfaces.append(gm.addPlaneSurface([straight_loop]))
-        #     # inner octagon surfaces
-        #     octagon_loop = gm.addCurveLoop([upper_octagon_edges[2 * i], upper_octagon_segments[i], upper_octagon_segments[(i + 1)%4], upper_octagon_edges[2 * i + 1]], reorient= True)
-        #     upper_octagon_surfaces.append(gm.addPlaneSurface([octagon_loop]))
-
-        # draw lines to connect -z and +z faces
-        # for i in range(4):
-
-        # draw connecting surfaces
-
-        # draw volumes
-
-        # define transfinite characteristics
-        # TODO investigate sensible coef values for "bump" mode
-        msh = gmsh.model.geo.mesh
-        # TODO logically separate nPoints for the different size scales present
+        # id 1, noslip, this is relevant for the outer_curved and outer_straight
+        # extrudes, as well as all the pre-extruded surfaces
+        tank_surfaces = [inner_square_surfaces[0]]
         for i in range(4):
-            # curved lines
-            msh.setTransfiniteCurve(outer_curves[i], nPoints=self.outer_curve_npts)
-            msh.setTransfiniteCurve(inner_curves[i], nPoints=self.outer_curve_npts)
+            # bottom of tank
+            tank_surfaces.append(outer_curved_surfaces[2 * i])
+            tank_surfaces.append(outer_curved_surfaces[2 * i + 1])
+            tank_surfaces.append(inner_curved_surfaces[2 * i])
+            tank_surfaces.append(inner_curved_surfaces[2 * i + 1])
+            tank_surfaces.append(outer_straight_surfaces[i])
+            tank_surfaces.append(inner_straight_surfaces[i])
+            tank_surfaces.append(square_surfaces[i])
+            # lateral surfaces - curves: curves are last in the loops defining
+            # outer_curved_surfaces, so should be the last elements
+            tank_surfaces.append(outer_curved_extrude[2 * i][-1][1])
+            tank_surfaces.append(outer_curved_extrude[2 * i + 1][-1][1])
+            # lateral surfaces - baffle sides: outer_curved_extrude 2*i has
+            # outside edge, and 2*i + 1 the inside edge
+            tank_surfaces.append(outer_curved_extrude[2 * i][2][1])
+            tank_surfaces.append(outer_curved_extrude[2 * i + 1][4][1])
+            # lateral surfaces - baffle front: outer_straight extrude has
+            # these at the 1st surface past the volume in the returned list
+            tank_surfaces.append(outer_straight_extrude[i][2][1])
 
-            # msh.setTransfiniteCurve(upper_outer_curves[i], nPoints=self.outer_curve_npts)
-            # msh.setTransfiniteCurve(upper_inner_curves[i], nPoints=self.outer_curve_npts)
-            # straight sections
-            msh.setTransfiniteCurve(
-                baffle_extended_edges[i], nPoints=self.outer_curve_npts
-            )
-            msh.setTransfiniteCurve(baffle_inside_edges[i], nPoints=self.baffle_npts)
-            msh.setTransfiniteCurve(baffle_outside_edges[i], nPoints=self.baffle_npts)
-            # msh.setTransfiniteCurve(baffle_to_octagon_inside[i], nPoints=self.baffle_to_octagon_npts)
-            # msh.setTransfiniteCurve(baffle_to_octagon_outside[i], nPoints=self.baffle_to_octagon_npts)
-            # msh.setTransfiniteCurve(octagon_edges[2*i+1], nPoints=self.outer_curve_npts)
-            # msh.setTransfiniteCurve(octagon_edges[2*i], nPoints=self.outer_curve_npts)
+        gm.addPhysicalGroup(SURFACE, tank_surfaces)
 
-            # msh.setTransfiniteCurve(upper_baffle_extended_edges[i], nPoints=self.outer_curve_npts)
-            # msh.setTransfiniteCurve(upper_baffle_inside_edges[i], nPoints=self.baffle_npts)
-            # msh.setTransfiniteCurve(upper_baffle_outside_edges[i], nPoints=self.baffle_npts)
-            # msh.setTransfiniteCurve(upper_baffle_to_octagon_inside[i], nPoints=self.baffle_to_octagon_npts)
-            # msh.setTransfiniteCurve(upper_baffle_to_octagon_outside[i], nPoints=self.baffle_to_octagon_npts)
-            # msh.setTransfiniteCurve(upper_octagon_edges[2*i+1], nPoints=self.outer_curve_npts)
-            # msh.setTransfiniteCurve(upper_octagon_edges[2*i], nPoints=self.outer_curve_npts)
-            # octagon segments
-            # msh.setTransfiniteCurve(octagon_segments[i], nPoints=self.outer_curve_npts)
-
-            # msh.setTransfiniteCurve(upper_octagon_segments[i], nPoints=self.outer_curve_npts)
-
-            # connecting lines
-
+        # id 2, weakly imposed noslip, this is the first element of each extrude
+        top_surfaces = [inner_square_extrude[0][1]]
         for i in range(4):
-            # -z face surfaces
-            msh.setTransfiniteSurface(outer_surfaces[i])
-            msh.setRecombine(SURFACE, outer_surfaces[i])
-            # msh.setTransfiniteSurface(inner_surfaces[i])
-            # msh.setRecombine(SURFACE, inner_surfaces[i])
-            # msh.setTransfiniteSurface(straight_surfaces[i])
-            # msh.setRecombine(SURFACE, straight_surfaces[i])
-            # msh.setTransfiniteSurface(octagon_surfaces[i])
-            # msh.setRecombine(SURFACE, octagon_surfaces[i])
-            # +z face surfaces
-            # msh.setTransfiniteSurface(upper_outer_surfaces[i])
-            # msh.setRecombine(SURFACE, upper_outer_surfaces[i])
-            # msh.setTransfiniteSurface(upper_inner_surfaces[i])
-            # msh.setRecombine(SURFACE, upper_inner_surfaces[i])
-            # msh.setTransfiniteSurface(upper_straight_surfaces[i])
-            # msh.setRecombine(SURFACE, upper_straight_surfaces[i])
-            # msh.setTransfiniteSurface(upper_octagon_surfaces[i])
-            # msh.setRecombine(SURFACE, upper_octagon_surfaces[i])
-            # connecting surfaces
+            top_surfaces.append(outer_curved_extrude[2 * i][0][1])
+            top_surfaces.append(outer_curved_extrude[2 * i + 1][0][1])
+            top_surfaces.append(inner_curved_extrude[2 * i][0][1])
+            top_surfaces.append(inner_curved_extrude[2 * i + 1][0][1])
+            top_surfaces.append(outer_straight_extrude[i][0][1])
+            top_surfaces.append(inner_straight_extrude[i][0][1])
+            top_surfaces.append(square_extrude[i][0][1])
 
-        # define physical surfaces and volume
+        gm.addPhysicalGroup(SURFACE, top_surfaces)
+
+        # physical volume
+        gm.addPhysicalGroup(VOLUME, [tag for _, tag in gmsh.model.getEntities(VOLUME)])
 
     def export(self):
         gmsh.model.geo.synchronize()
-        raw_file = f"{self.filepath}.geo_unrolled"
-        new_file = f"{self.filepath}.geo"
-        gmsh.write(raw_file)
+
         # gmsh.model.mesh.generate(VOLUME)
         # gmsh.model.mesh.setOrder(2)
         gmsh.model.geo.synchronize()
